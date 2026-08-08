@@ -3,7 +3,7 @@
    that shows up on the operations board. */
 
 import { h, icon, money, toast, fmtTime } from '../../lib/ui.js';
-import { cartTotals, clearCart, setQty, stepper, totalRow, initialsOf } from '../cart.js';
+import { cartTotals, clearCart, setQty, stepper, totalRow, tile } from '../cart.js';
 import { CHANNELS, discountByCode } from '../data.js';
 
 const PAYMENTS = [
@@ -48,7 +48,7 @@ export default function renderCheckout(ctx) {
       return card;
     }
     lines.forEach((l) => card.appendChild(h('div', { class: 'cartline' },
-      h('span', { class: `tile tile--sm tone-${l.tone}` }, initialsOf(l.name)),
+      tile(l, 'tile--sm'),
       h('div', { class: 'cartline__main' },
         h('div', { class: 'cartline__name' }, l.name),
         step === 1

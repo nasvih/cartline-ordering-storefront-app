@@ -2,7 +2,7 @@
 
 import { h, icon, money, fmtTime, fmtDate, ago } from '../../lib/ui.js';
 import { STATUSES, orderByNo, dayKey } from '../data.js';
-import { initialsOf } from '../cart.js';
+import { tile } from '../cart.js';
 
 const STEP_LABEL = {
   new: 'Received', preparing: 'Preparing', ready: 'Ready', completed: 'Handed over',
@@ -93,7 +93,7 @@ function detail(ctx, o) {
       h('hr', { class: 'hr' }),
       h('h3', { style: 'margin-bottom:10px' }, 'Items'),
       o.items.map((it) => h('div', { class: 'cartline' },
-        h('span', { class: `tile tile--sm tone-${toneOf(ctx, it)}` }, initialsOf(it.name)),
+        tile({ productId: it.productId, name: it.name, tone: toneOf(ctx, it) }, 'tile--sm'),
         h('div', { class: 'cartline__main' },
           h('div', { class: 'cartline__name' }, it.name),
           h('div', { class: 'small muted mono' }, `${it.qty} × ${money(it.price, ctx.currency())}`)),

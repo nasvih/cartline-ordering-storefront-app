@@ -5,7 +5,7 @@
 
 import { h, icon, money, modal, toast, confirmDialog, fmtTime, fmtDate, ago } from '../lib/ui.js';
 import { STATUSES, REFUND_REASONS } from './data.js';
-import { initialsOf } from './cart.js';
+import { tile } from './cart.js';
 import { pillClass } from './views/track.js';
 
 export const STEP_LABEL = { new: 'New', preparing: 'Preparing', ready: 'Ready', completed: 'Completed', refunded: 'Refunded', cancelled: 'Cancelled' };
@@ -160,7 +160,7 @@ export function openOrder(ctx, orderId, onChange) {
     body.appendChild(h('hr', { class: 'hr' }));
     body.appendChild(h('h4', { style: 'margin-bottom:8px' }, 'Items'));
     o.items.forEach((it) => body.appendChild(h('div', { class: 'cartline' },
-      h('span', { class: 'tile tile--sm tone-6' }, initialsOf(it.name)),
+      tile({ productId: it.productId, name: it.name, tone: 6 }, 'tile--sm'),
       h('div', { class: 'cartline__main' },
         h('div', { class: 'cartline__name' }, it.name),
         h('div', { class: 'small muted mono' }, `${it.qty} × ${money(it.price, ctx.currency())}`)),

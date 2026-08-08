@@ -2,7 +2,7 @@
 
 import { h, icon, money, num, pct, modal, toast, confirmDialog, downloadCSV } from '../../lib/ui.js';
 import { CATEGORIES, lowStock, dayKey } from '../data.js';
-import { initialsOf } from '../cart.js';
+import { tile } from '../cart.js';
 
 export default function renderProducts(ctx) {
   const wrap = h('div', {});
@@ -79,7 +79,7 @@ export default function renderProducts(ctx) {
         h('th', {}, 'Stock'), h('th', {}, 'State'), h('th', { class: 'right' }, 'Action'))),
       h('tbody', {}, list.map((p) => h('tr', {},
         h('td', {}, h('div', { class: 'row', style: 'flex-wrap:nowrap' },
-          h('span', { class: `tile tile--sm tone-${p.tone}` }, initialsOf(p.name)),
+          tile(p, 'tile--sm'),
           h('span', { class: 'linkish', role: 'button', tabindex: '0', onclick: () => editProduct(ctx, p, paint), onkeydown: (e) => { if (e.key === 'Enter') editProduct(ctx, p, paint); } }, p.name))),
         h('td', { class: 'mono small' }, p.sku),
         h('td', { class: 'small muted' }, catName(p.category)),

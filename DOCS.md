@@ -2,6 +2,35 @@
 
 Architecture, data model, module map and the things worth knowing before you extend it.
 
+## What this is
+
+Cartline is an ordering and storefront application with two faces over one set of records.
+Customers browse the catalogue, fill a cart and check out on the storefront; the shop runs the day
+on the operations side — the order board, products and stock, discount codes and the day summary.
+
+They are not two systems, and there is no synchronisation between them. There is one state object,
+and both faces are views onto it: the order the storefront writes is the record the board moves,
+the record that took stock down, and the record the day summary counts.
+
+## Where it helps a business
+
+- Orders arrive as records rather than as messages, so nothing is missed at a busy hour.
+- The kitchen or counter works one board instead of a stack of chits.
+- Stock counts move as orders are placed, so what is nearly out is visible before it runs out.
+- Refunds carry a reason, which is what makes them reviewable later.
+- The day's takings, average order value and best sellers are a screen rather than an evening's
+  arithmetic.
+
+## How it would work for real
+
+The same interface, with browser storage swapped for a real database, a real payment provider in
+place of the simulated step, staff accounts so actions are attributable, and printing or a counter
+display for the kitchen. Concretely: `createStore` becomes an API client, `placeOrder()` becomes a
+transaction, and the board's status writes become authenticated endpoints. The view modules, the
+routing and the derived reads in `src/data.js` would survive that swap largely intact — which is
+the point of keeping them free of DOM and of storage detail. What is here is the interface and the
+workflow, not the production system behind them.
+
 ## How this demo works
 
 **You can actually use it.** Every flow writes. Checkout creates an order, board buttons change its
@@ -10,7 +39,11 @@ settings changes what the other screens compute with.
 
 **Your data stays on your machine.** State lives in one `localStorage` key, `cartline.state.v1`.
 There is no account, no backend, no network call of any kind, and no real payment. Clearing browser
-data or pressing "Reset demo data" removes it. Nothing syncs between browsers or devices.
+data or pressing "Reset demo data" removes it. Nothing syncs between browsers or devices. The
+sidebar preferences live in a second key, `cartline.chrome.v1`, so a reset does not clear them.
+
+**The payment step is simulated.** No card details are asked for, taken or sent anywhere; the
+authorisation on step 2 of checkout is a timed animation.
 
 **The assistant is simulated.** `src/agent.js` matches the question against regular expressions and
 keywords, then builds the answer from the live store. There is no model and no request; the
@@ -35,7 +68,9 @@ index.html
        ├─ createStore(KEY, seedState)   state + persistence
        ├─ shell (sidebar, topbar, view host)
        ├─ router(ROUTES, cb)            hash routing
-       ├─ buildAgent(ctx).mount()       assistant launcher
+       ├─ applyPrefs()                  sidebar rail + tone, own storage key
+       ├─ initPWA()                     service worker + install control
+       ├─ buildAgent(ctx).mount()       assistant launcher (the only one)
        └─ paintView() → ROUTES[name].render(ctx, params, query) → Node
 ```
 
@@ -90,7 +125,9 @@ One object, one localStorage key.
 ```
 
 `tone` is 1–6 and picks the solid tile colour class (`tone-1` … `tone-6` in `cartline.css`), one
-per category. There are no product images anywhere in the app.
+per category. The photograph is not part of the product record — it is looked up by id through
+`productImage()`, so renaming or repricing a product keeps its picture and an added product simply
+has none. See "Product photography" below.
 
 **Discount**
 
@@ -152,8 +189,9 @@ something real to show.
 |---|---|---|
 | `lib/ui.js` | `h`, `qs`, `qsa`, `on`, `esc`, `money`, `num`, `pct`, `fmtDate`, `fmtTime`, `ago`, `isoDay`, `daysFromNow`, `seeded`, `pick`, `between`, `createStore`, `router`, `toast`, `modal`, `confirmDialog`, `downloadCSV`, `barChart`, `meter`, `icon`, `ICONS` | Shared kit, copied unmodified. |
 | `lib/assistant.js` | `Assistant` | Shared kit, copied unmodified. |
-| `src/data.js` | `STORAGE_KEY`, `seedState`, constants, derived reads | No DOM. |
-| `src/cart.js` | `cartLines`, `cartCount`, `cartTotals`, `addToCart`, `setQty`, `clearCart`, `showCart`, `toggleCart`, `closeCart`, `stepper`, `totalRow`, `initialsOf` | Cart state and drawer. |
+| `lib/pwa.js` | `initPWA` | Shared kit, copied unmodified. Registers `sw.js`, adds the install control. |
+| `src/data.js` | `STORAGE_KEY`, `seedState`, `productImage`, constants, derived reads | No DOM. |
+| `src/cart.js` | `cartLines`, `cartCount`, `cartTotals`, `addToCart`, `setQty`, `clearCart`, `showCart`, `toggleCart`, `closeCart`, `stepper`, `totalRow`, `initialsOf`, `tile` | Cart state, the drawer, and the one product tile used everywhere. |
 | `src/orderops.js` | `nextStatus`, `setStatus`, `advance`, `cancelOrder`, `refundOrder`, `openOrder`, `closeOrder`, `STEP_LABEL` | Everything that mutates an order. |
 | `src/agent.js` | `buildAgent(ctx)` | 15 intents plus 4 fallbacks. |
 | `src/views/shop.js` | `render(ctx)` | Grid, filters, product modal. |
@@ -244,6 +282,57 @@ browsers holding older state — or bump `STORAGE_KEY` to `cartline.state.v2` to
 **A new status.** `STATUSES` in `src/data.js` drives the board columns, the tracking strip and
 `nextStatus()`. Adding to that array adds a column.
 
+## Product photography
+
+`PRODUCT_IMAGES` in `src/data.js` maps a product id to a file under `assets/products/` and its alt
+text. `productImage(p)` returns `{src, alt}` or `null`. Nothing about the photograph is stored in
+state, so a product that is renamed or repriced keeps its picture and an added product simply has
+none.
+
+`tile(item, extraClass)` in `src/cart.js` is the single component every surface uses — the grid,
+the product modal, the cart drawer, checkout, the order detail drawer, the tracking screen and the
+operations table. It renders the solid colour tile with the product's initials, and lays the
+photograph over it when there is one. An `error` listener removes the `img` and the `tile--photo`
+class, so a missing file degrades to the tile rather than to a broken image.
+
+Photographs are 600px square JPEGs under 80KB, `object-fit: contain` inside a fixed square frame
+(88px in the grid, 126px in the modal, 32px in a row), centred, so a tall bottle and a wide plate
+read as one set. They are served from this repository: the app makes no image request off-origin.
+Attribution is in `CREDITS.md`. The photographs are not covered by this repository's `LICENSE` —
+each stays under its own upstream licence, which `CREDITS.md` states plainly.
+
+## The sidebar controls
+
+Both controls live on the brand row as icon-only buttons (`.side__brandbtns`), because they change
+the sidebar and belong on it rather than among the app's own actions. Their labels live in `title`
+and `aria-label`; `aria-pressed` carries the state. The colour control is deliberately named for
+the setting ("Sidebar colour") rather than for the colour it would switch to, so its accessible
+name does not change under a screen reader while `aria-pressed` flips.
+
+`cartline.chrome.v1` holds `{ rail, tone }` — deliberately not part of the demo state, so
+"Reset demo data" does not throw the preference away.
+
+`.shell.is-rail` is a two-class selector, so it out-specifies the kit's `@media (max-width:900px)`
+rule for `.shell`. A rail below 900px would therefore win and leave a 64px stub where a drawer
+should be. `applyPrefs()` only ever adds the class when `matchMedia('(min-width:901px)')` matches
+and re-runs on the media query's `change` event; `cartline.css` hides `.railbtn` under 900px and
+re-states the single-column grid there as a second line of defence.
+
+The yellow sidebar is the default. `.side[data-tone="amber"]` keeps every text colour on the ink
+side — `--ink` at 10.8:1 and `--amber-darker` at 4.4:1 on `#EAC81C`. There is no white text on
+yellow anywhere. `.hint` is darkened to `--ink-2` because `--faint` only reaches 3.1:1 there.
+
+## Installing
+
+`manifest.webmanifest` plus `sw.js` make the app installable. `SHELL` in `sw.js` is an explicit
+list of every file the app needs offline, including all 26 product photographs — bump
+`CACHE_VERSION` whenever that list or a cached file changes, or browsers will keep serving the old
+copy. `initPWA()` registers the worker and adds "Install app" to the sidebar footer only when the
+browser fires `beforeinstallprompt` (or the device is iOS, where it explains the Share menu route
+instead). The install control is inserted into the footer's second `.side__pair` ahead of "Reset
+demo data", so that row is a single full-width Reset until an install is offered, and two halves
+afterwards.
+
 ## Accessibility
 
 - Semantic landmarks: `aside` sidebar, `header` topbar, `nav`, `main`.
@@ -255,6 +344,12 @@ browsers holding older state — or bump `STORAGE_KEY` to `cartline.state.v2` to
 - Drawers and modals close on `Escape` and on a click outside.
 - Works down to 390px with no horizontal scroll. Under 900px the sidebar slides in behind the menu
   button; the board falls to two columns, then one.
+- Nav links carry `title` and `aria-label` as well as visible text, so the icon rail is still
+  readable. Both sidebar toggles carry `aria-pressed` and a label that names the result.
+- The link to nasvih.in says in its `aria-label` that it opens in a new tab.
+- Every product photograph has descriptive alt text; a product with no photograph falls back to a
+  tile carrying its initials, which is decorative next to the product name beside it.
+- There is exactly one way into the assistant on screen — the round launcher — plus `⌘K`.
 
 ## Keyboard shortcuts
 
@@ -301,6 +396,10 @@ for f in $(find . -name '*.js'); do cp "$f" /tmp/chk.mjs && node --check /tmp/ch
 # serve and load — expect zero console errors
 python3 -m http.server 4103
 ```
+
+Worth asserting in a browser: every `.tile__img` resolves to this origin, there is exactly one
+`.assist-fab`, both sidebar toggles survive a reload and a "Reset demo data", no route scrolls
+horizontally at 390px, and the console stays empty.
 
 Then walk the loop that matters: add to cart → checkout → the order shows on the board → advance it
 → refund it → the day summary and the assistant both change.

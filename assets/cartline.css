@@ -29,7 +29,10 @@
 .prod__price{font-family:var(--mono);font-weight:600;font-size:14.5px;font-variant-numeric:tabular-nums}
 .prod--off{opacity:.62}
 
-.tile{height:104px;display:grid;place-items:center;border-bottom:1px solid var(--line);font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.06em}
+/* A product is pictured either by its photograph or, when it has none, by the
+   solid colour tile carrying its initials. Both occupy the same box so the
+   grid stays even whichever one a product gets. */
+.tile{position:relative;overflow:hidden;height:104px;display:grid;place-items:center;border-bottom:1px solid var(--line);font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.06em}
 .tile--lg{height:150px;border:1px solid var(--line);border-radius:var(--r);font-size:30px}
 .tile--sm{height:40px;width:40px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:12px;flex:none}
 .tone-1{background:var(--amber-soft);color:var(--amber-deep);border-color:var(--amber-line)}
@@ -38,6 +41,16 @@
 .tone-4{background:var(--warn-soft);color:var(--warn);border-color:var(--warn-line)}
 .tone-5{background:var(--bad-soft);color:var(--bad);border-color:var(--bad-line)}
 .tone-6{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
+
+/* The photograph sits in the same box as the colour tile, contained rather
+   than cropped and centred both ways with even padding, so a tall bottle and
+   a wide plate read as one set. It stays a quiet part of the card — the name
+   and the price still lead. If the file ever fails to load the img is dropped
+   and .tile--photo comes off, so the colour tile shows again. */
+.tile--photo{background:var(--surface);border-color:var(--line);color:transparent}
+.tile__img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88px;height:88px;object-fit:contain;object-position:center center;display:block}
+.tile--lg .tile__img{width:126px;height:126px}
+.tile--sm .tile__img{width:32px;height:32px}
 
 .qty{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
 .qty button{width:28px;height:28px;border:0;background:none;cursor:pointer;color:var(--ink);display:grid;place-items:center}
@@ -120,9 +133,41 @@
 .split i{display:block;height:100%}
 .sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--gutter)}
 
+/* a plain marked list for prose panels — same square amber marker the
+   assistant uses for its lists, so the two read as one language */
+.ticks{margin:6px 0 0;padding-left:0}
+.ticks li{position:relative;padding-left:16px;margin-top:5px;line-height:1.5}
+.ticks li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;background:var(--amber);border-radius:1px}
+
+/* == sidebar footer link out ==
+   The one dark element in the sidebar, so it reads as a way out of the demo
+   whether the sidebar is yellow or white. White on #17181A is 15.9:1. The
+   selectors carry the .side prefix because the yellow sidebar restyles .btn
+   at two levels of specificity and would otherwise wash this one out. */
+.side .sitelink,
+.side[data-tone="amber"] .sitelink{background:var(--night);border-color:var(--night);color:#fff;text-decoration:none}
+.side .sitelink:hover,
+.side[data-tone="amber"] .sitelink:hover{background:var(--night-2);border-color:var(--night-2);color:#fff}
+.side .sitelink svg{color:#fff}
+/* two controls in one 248px row leave about 110px each; the kit's default
+   14px side padding truncates "nasvih.in" to an ellipsis, so tighten it */
+.side__foot .side__pair .btn{padding-left:9px;padding-right:9px;gap:6px}
+.shell.is-rail .side__foot .side__pair .btn{padding-left:0;padding-right:0}
+/* the footnote is --faint, which only reaches 3.1:1 on #EAC81C — ink-2 on
+   yellow is 9.2:1, so the yellow sidebar darkens it. */
+.side[data-tone="amber"] .hint{color:var(--ink-2)}
+
 /* == responsive == */
 @media (max-width:1080px){ .board{grid-template-columns:repeat(2,minmax(0,1fr))} }
-@media (max-width:900px){ .topbar__store{display:none} }
+@media (max-width:900px){
+  .topbar__store{display:none}
+  /* Below 900px the sidebar is a full-width drawer, so an icon rail makes no
+     sense. .shell.is-rail out-specifies the kit's media query, so the class is
+     never applied down here (see applyPrefs in main.js) and the control that
+     sets it is hidden — this rule is the belt to that braces. */
+  .shell.is-rail{grid-template-columns:minmax(0,1fr)}
+  .railbtn{display:none}
+}
 @media (max-width:640px){
   .board{grid-template-columns:minmax(0,1fr)}
   .payopts{grid-template-columns:minmax(0,1fr)}

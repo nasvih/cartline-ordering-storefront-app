@@ -4,7 +4,7 @@
    ============================================================ */
 
 import { h, icon, money, toast } from '../lib/ui.js';
-import { priceCart, productById, discountByCode } from './data.js';
+import { priceCart, productById, discountByCode, productImage } from './data.js';
 
 export function cartLines(state) {
   return state.cart.items.map((it) => {
@@ -92,7 +92,7 @@ export function showCart(ctx) {
     } else {
       lines.forEach((l) => {
         body.appendChild(h('div', { class: 'cartline' },
-          h('div', { class: `tile tile--sm tone-${l.tone}` }, initialsOf(l.name)),
+          tile(l, 'tile--sm'),
           h('div', { class: 'cartline__main' },
             h('div', { class: 'cartline__name' }, l.name),
             h('div', { class: 'small muted mono' }, `${money(l.price, ctx.state.settings.currency)} each`),
@@ -169,4 +169,26 @@ export function totalRow(label, value) {
 
 export function initialsOf(name) {
   return String(name || '?').replace(/[^A-Za-z ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+}
+
+/* ---------- the product tile ----------
+   One component for every place a product is pictured: the storefront grid,
+   the product modal, the cart drawer, checkout and the operations table. It
+   shows the photograph when the product has one and the solid colour tile
+   with the product's initials when it does not — and it drops back to that
+   same tile if the file ever fails to load, so the grid never shows a hole. */
+
+export function tile(item, extraClass = '') {
+  const id = item && (item.productId || item.id);
+  const name = item ? item.name : '';
+  const tone = (item && item.tone) || 1;
+  const cls = `tile tone-${tone}${extraClass ? ` ${extraClass}` : ''}`;
+  const photo = productImage(id);
+  const el = h('span', { class: cls }, initialsOf(name));
+  if (!photo) return el;
+  const img = h('img', { class: 'tile__img', src: photo.src, alt: photo.alt, loading: 'lazy', decoding: 'async' });
+  img.addEventListener('error', () => { img.remove(); el.classList.remove('tile--photo'); });
+  el.classList.add('tile--photo');
+  el.appendChild(img);
+  return el;
 }

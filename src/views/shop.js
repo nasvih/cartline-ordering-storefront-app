@@ -2,7 +2,7 @@
 
 import { h, icon, money, modal, toast } from '../../lib/ui.js';
 import { CATEGORIES } from '../data.js';
-import { addToCart, cartCount, initialsOf, stepper, showCart } from '../cart.js';
+import { addToCart, cartCount, tile, stepper, showCart } from '../cart.js';
 
 export default function renderShop(ctx) {
   const wrap = h('div', {});
@@ -88,7 +88,7 @@ export default function renderShop(ctx) {
       'aria-label': `${p.name}, ${money(p.price, ctx.currency())}`,
       onclick: () => openProduct(p),
     },
-    h('span', { class: `tile tone-${p.tone}` }, initialsOf(p.name)),
+    tile(p),
     h('span', { class: 'prod__body' },
       h('span', { class: 'prod__name' }, p.name),
       h('span', { class: 'small muted' }, catName(p.category)),
@@ -100,8 +100,10 @@ export default function renderShop(ctx) {
   function openProduct(p) {
     let qty = 1;
     const soldOut = p.stock <= 0 || !ctx.state.settings.acceptingOrders;
+    const hero = tile(p, 'tile--lg');
+    hero.style.marginBottom = '14px';
     const body = h('div', {},
-      h('div', { class: `tile tile--lg tone-${p.tone}`, style: 'margin-bottom:14px' }, initialsOf(p.name)),
+      hero,
       h('div', { class: 'between', style: 'align-items:flex-start' },
         h('div', {}, h('h3', {}, p.name), h('p', { class: 'small muted' }, catName(p.category))),
         h('span', { class: 'prod__price' }, money(p.price, ctx.currency()))),
