@@ -41,7 +41,7 @@ export function applyTheme(theme) {
 
 /** The bell's neighbour: one button that flips the whole palette. */
 export function createThemeButton() {
-  let theme = readStored() || (systemDark.matches ? 'dark' : 'light');
+  let theme = readStored() || 'light';
   const btn = h('button', { class: 'btn btn--ghost btn--icon', type: 'button' });
 
   const sync = () => {

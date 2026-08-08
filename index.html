@@ -14,7 +14,7 @@
     (function () {
       try {
         var t = localStorage.getItem('cartline.theme.v1');
-        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (!t) t = 'light';
         if (t === 'dark') {
           document.documentElement.setAttribute('data-theme', 'dark');
           var m = document.querySelector('meta[name="theme-color"]');
