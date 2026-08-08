@@ -164,8 +164,107 @@
    yellow is 9.2:1, so the yellow sidebar darkens it. */
 .side[data-tone="amber"] .hint{color:var(--ink-2)}
 
+/* == 9. topbar tools: device preview, notifications, dark mode == */
+.topbar__tools{display:flex;align-items:center;gap:8px}
+/* the device toggle borrows the storefront/operations switch shape so the two
+   groups in the topbar read as one control language. Icon only: the labels are
+   carried by title and aria-label. */
+.devicesw button{padding:7px 11px}
+.devicesw button span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.aboutbtn svg{width:16px;height:16px}
+
+/* notifications: a bell with an unread count and a panel hung under it */
+.notifwrap{position:relative;display:inline-flex}
+.notifpanel{position:absolute;top:calc(100% + 10px);right:0;z-index:45;width:min(380px,calc(100vw - 24px));max-height:min(560px,calc(100vh - 96px));display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-3)}
+.notifpanel__head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);flex:none}
+.notifpanel__foot{padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-2);margin:0;flex:none}
+.notiflist{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px}
+.notiflist .empty{padding:26px 16px}
+.notif{display:flex;align-items:flex-start;gap:4px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:2px}
+.notif.is-unread{border-color:var(--amber-line);background:var(--amber-soft)}
+.notif__main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:8px 9px;border:0;border-radius:var(--r-sm);background:none;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.notif__main:hover{background:var(--hover)}
+.notif__top{display:flex;align-items:center;gap:8px}
+.notif__when{font-size:10.5px;color:var(--faint);margin-left:auto;white-space:nowrap}
+.notif__title{font-weight:600;font-size:13.5px;line-height:1.35}
+.notif__body{font-size:12.5px;color:var(--muted);line-height:1.45}
+.notif__read{flex:none;width:30px;height:30px;padding:0;margin-top:5px}
+
+/* == 10. phone preview ==
+   The app inside an iframe at 390 × 844, in a dark bezel on the brand yellow.
+   The frame is a real viewport, so the app's own breakpoints do the work. */
+.devicepv{position:fixed;inset:0;z-index:78;display:flex;flex-direction:column;align-items:center;padding:18px 16px 30px;overflow:auto;background:var(--amber-fill);color:var(--ink)}
+.devicepv__bar{width:100%;max-width:900px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.devicepv__id{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.devicepv__name{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.devicepv__size{font-size:11px;letter-spacing:.08em;color:var(--ink-2)}
+.devicepv__note{width:100%;max-width:74ch;font-size:12.5px;line-height:1.5;color:var(--ink-2);margin-bottom:16px}
+.devicepv .btn{background:rgba(255,255,255,.82);border-color:rgba(23,24,26,.2);color:var(--ink)}
+.devicepv .btn:hover{background:#fff;border-color:rgba(23,24,26,.34)}
+.devicepv :focus-visible{outline-color:var(--ink)}
+.devicepv__fit{flex:none}
+.phone{position:relative;width:416px;padding:13px;border-radius:46px;background:#101114;border:1px solid rgba(23,24,26,.4);box-shadow:var(--shadow-3);transform-origin:top center}
+.phone__screen{width:390px;height:844px;border:0;border-radius:34px;background:var(--bg);display:block}
+.phone__speaker{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:54px;height:4px;border-radius:2px;background:#33363B}
+.phone__bar{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:118px;height:4px;border-radius:2px;background:#33363B}
+
+/* == 11. worked examples in the About modal == */
+.exlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ex{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2);padding:10px 12px}
+.ex__ask{font-size:12.5px;font-weight:600;color:var(--ink)}
+.ex__out{margin-top:3px}
+
+/* == 12. dark mode ==
+   Two things in this app do not simply follow the palette swap.
+
+   First the yellow sidebar. #EAC81C stays #EAC81C in the dark — a brand colour
+   that changes is not a brand colour — and yellow only ever carries ink text.
+   The dark palette flips --ink to near-white, so every rule that paints on the
+   yellow pins the light ink values back by hand. #17181A on #EAC81C is 10.8:1
+   and #2E3033 is 8:1; the near-white it replaces was 1.9:1.
+
+   Second the product cut-outs. Their drop shadow is ink at low alpha, which is
+   invisible on a dark surface, so the dark theme uses a deeper black — the
+   photographs still sit on the card rather than float over it. */
+[data-theme="dark"] .side[data-tone="amber"] .side__name,
+[data-theme="dark"] .side[data-tone="amber"] .navlink,
+[data-theme="dark"] .side[data-tone="amber"] .btn,
+[data-theme="dark"] .side[data-tone="amber"] .side__brandbtns .btn{color:#17181A}
+[data-theme="dark"] .side[data-tone="amber"] .side__tag,
+[data-theme="dark"] .side[data-tone="amber"] .navgroup__label,
+[data-theme="dark"] .side[data-tone="amber"] .navlink__count,
+[data-theme="dark"] .side[data-tone="amber"] .hint{color:#2E3033}
+/* the one dark button in the sidebar keeps white text — the rule above is
+   about text sitting on the yellow, and this one sits on #0F1012 */
+[data-theme="dark"] .side[data-tone="amber"] .sitelink,
+[data-theme="dark"] .side .sitelink{color:#fff}
+[data-theme="dark"] .side[data-tone="amber"] .mark{background:#17181A;color:var(--amber-fill)}
+[data-theme="dark"] .side[data-tone="amber"] .navlink svg{color:#6B5400}
+[data-theme="dark"] .side[data-tone="amber"] :focus-visible{outline-color:#17181A}
+/* the dark sidebar's active row is the page ground, so it keeps the light ink */
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{color:var(--ink)}
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active svg{color:var(--amber-deep)}
+/* the yellow phone surround is the same problem at page scale */
+[data-theme="dark"] .devicepv{color:#17181A}
+[data-theme="dark"] .devicepv__size,
+[data-theme="dark"] .devicepv__note{color:#2E3033}
+[data-theme="dark"] .devicepv .btn{color:#17181A}
+[data-theme="dark"] .devicepv :focus-visible{outline-color:#17181A}
+
+[data-theme="dark"] .tile__img{filter:drop-shadow(0 3px 5px rgba(0,0,0,.62))}
+[data-theme="dark"] .tile--lg .tile__img{filter:drop-shadow(0 5px 9px rgba(0,0,0,.6))}
+[data-theme="dark"] .tile--sm .tile__img{filter:drop-shadow(0 1px 2px rgba(0,0,0,.66))}
+
 /* == responsive == */
 @media (max-width:1080px){ .board{grid-template-columns:repeat(2,minmax(0,1fr))} }
+/* Under 760px the topbar has no room for a phone preview, and the device it is
+   running on already is the phone. The framed copy hides it at every width. */
+@media (max-width:760px){ .devicesw{display:none} }
+.is-framed .devicesw{display:none}
+@media (max-width:1080px){
+  .aboutbtn span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .aboutbtn{width:34px;height:34px;padding:7px}
+}
 @media (max-width:900px){
   .topbar__store{display:none}
   /* Below 900px the sidebar is a full-width drawer, so an icon rail makes no
@@ -183,5 +282,11 @@
   .faceswitch button{padding:7px 10px}
   .kv{grid-template-columns:minmax(0,1fr)}
   .kv dd{margin-bottom:6px}
+  /* the panel is wider than the topbar has room for, so it becomes a sheet
+     pinned under the bar rather than a popover hanging off the bell */
+  /* the sheet stops short of the assistant launcher rather than running under it */
+  .notifpanel{position:fixed;top:calc(var(--bar) + 6px);left:8px;right:8px;width:auto;max-height:calc(100vh - var(--bar) - 96px)}
+  .topbar__tools{gap:4px}
+  .devicepv{padding:14px 10px 22px}
 }
 @media (max-width:390px){ .prods{grid-template-columns:minmax(0,1fr)} }

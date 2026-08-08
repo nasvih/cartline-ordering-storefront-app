@@ -3,6 +3,10 @@
    Every answer is assembled here from the live store: place an order,
    refund one, restock a product, and the replies change with it.
    There is no model and no network call anywhere in this file.
+
+   Two kinds of intent live behind this agent. The ones in src/actions.js
+   change the shop and are listed first, because an instruction should never
+   be answered as though it were a question. The ones below only read.
    ============================================================ */
 
 import { Assistant } from '../lib/assistant.js';
@@ -11,6 +15,7 @@ import {
   dayKey, dayLabel, lastDays, daySummary, topItems, revenueByHour, revenueByCategory,
   ordersOn, lowStock, orderByNo, STATUSES,
 } from './data.js';
+import { actionIntents, ACTION_EXAMPLES, READ_EXAMPLES } from './actions.js';
 
 const STEP_LABEL = { new: 'new', preparing: 'preparing', ready: 'ready', completed: 'completed', refunded: 'refunded', cancelled: 'cancelled' };
 
@@ -19,7 +24,7 @@ export function buildAgent(ctx) {
   const today = () => dayKey(new Date());
   const M = (n) => money(n, cur());
 
-  const intents = [
+  const reads = [
     {
       id: 'revenue-today',
       match: [/revenue|takings|sales|turnover|how much.*(made|sold)|money/i, 'revenue today'],
@@ -64,7 +69,9 @@ export function buildAgent(ctx) {
     },
     {
       id: 'low-stock',
-      match: [/\blow\b.{0,4}stock|running out|restock|reorder|out of stock|stock level|need.*reorder/i, 'low stock'],
+      /* "restock X" is an instruction handled in src/actions.js, so this
+         reader only claims the question shapes. */
+      match: [/\blow\b.{0,4}stock|running out|reorder|out of stock|stock level|need.*reorder/i, 'low stock'],
       trace: 'checked every listed product against the low-stock threshold',
       answer: () => {
         const low = lowStock(ctx.state);
@@ -319,29 +326,50 @@ export function buildAgent(ctx) {
     },
     {
       id: 'help',
-      match: [/what can you|help|how do you work|capabilit/i, 'help'],
-      trace: 'listed the intents this build ships with',
+      match: [/what can you|what do you do|help|how do you work|capabilit|what are you able/i, 'what can you do'],
+      trace: 'listed the intents and the actions this build ships with',
+      answer: () => {
+        const s = daySummary(ctx.state, today());
+        return {
+          text: `Two things. I **read** this store — the same records the screens draw from, ${num(s.orders)} orders and ${M(s.gross)} gross today — and I **change** it when you ask me to. Nothing is written until you press the button on my reply, and every change names the exact record and shows it before and after.\n\nSix things I can do to the shop:`,
+          table: {
+            head: ['Ask me this', 'What happens'],
+            rows: ACTION_EXAMPLES.map((e) => [`**${e.ask}**`, e.reply]),
+          },
+          meta: `${num(ACTION_EXAMPLES.length)} actions and ${num(reads.length)} readers over ${num(ctx.state.orders.length)} orders, ${num(ctx.state.products.length)} products and ${num(ctx.state.discounts.length)} codes`,
+          suggestions: ['Restock Karak Chai by 24', 'Move CL-1052 to ready', 'What questions can you answer?', "What is today's revenue?"],
+        };
+      },
+    },
+    {
+      id: 'help-read',
+      match: [/what (?:questions|else) can|what do you know|what can you tell/i],
+      trace: 'listed the reading intents this build ships with',
       answer: () => ({
-        text: 'I read the same store data the screens do. Things I answer well:\n\n- Today\'s revenue, net after refunds, and the comparison with yesterday\n- Best sellers and revenue by category\n- What is low on stock and what a top-up would cost\n- The status of any order by number, for example CL-1052\n- Refund counts and the reasons behind them\n- Average order value, the busiest hour, the week so far\n- Discount code usage and what each code gave away\n- Stock value at cost and at shelf price',
-        suggestions: ['What is today\'s revenue?', 'What sold best today?', 'What is low on stock?', 'Where is order CL-1052?'],
+        text: 'I read the same store data the screens do. Things I answer well:\n\n- Today\'s revenue, net after refunds, and the comparison with yesterday\n- Best sellers and revenue by category\n- What is low on stock and what a top-up would cost\n- The status of any order by number, for example CL-1052\n- Refund counts and the reasons behind them\n- Average order value, the busiest hour, the week so far\n- Discount code usage and what each code gave away\n- Stock value at cost and at shelf price\n\nAsk "what can you do?" for the six things I can change rather than report.',
+        table: { head: ['Ask me this', 'What comes back'], rows: READ_EXAMPLES.map((e) => [`**${e.ask}**`, e.reply]) },
+        suggestions: ['What is today\'s revenue?', 'What sold best today?', 'What is low on stock?', 'What can you do?'],
       }),
     },
   ];
+
+  /* Instructions first, questions second. */
+  const intents = [...actionIntents(ctx), ...reads];
 
   const bot = new Assistant({
     name: 'Cartline Assist',
     initials: 'CA',
     tag: 'Store agent · demo',
-    greeting: `I read this store's live data. Ask about today's takings, what is selling, what is running out, or an order by its number.`,
-    suggestions: ['What is today\'s revenue?', 'What sold best today?', 'What is low on stock?', 'Show the open orders'],
+    greeting: `I read this store's live data and I can change it. Ask about today's takings or an order by number — or tell me to restock something, move an order on, or set up a discount code. Ask "what can you do?" for the list.`,
+    suggestions: ['What can you do?', 'What is today\'s revenue?', 'Restock Karak Chai by 24', 'Show the open orders'],
     intents,
     fallbacks: [
       'I could not match that to anything in the store data. Try "what is today\'s revenue" and I will pull the day summary.',
       'That one is outside what this build answers. Try "what is low on stock" or "where is order CL-1052".',
-      'No intent for that yet. I do answer "what sold best today", "show the open orders" and "how does this week look".',
-      'I only answer from this store\'s own records. Try "which discount code costs most" or "which category earns most".',
+      'No intent for that yet. I do answer "what sold best today", and I can act — "restock Karak Chai by 24" or "move CL-1052 to ready".',
+      'I only work from this store\'s own records. Try "which discount code costs most", or ask "what can you do?" for the changes I can make.',
     ],
-    note: 'Simulated agent — answers are matched against this app\'s own demo data in your browser. No request leaves this device.',
+    note: 'Simulated agent — answers and actions are matched against this app\'s own demo data in your browser. No request leaves this device.',
     context: () => ({
       day: today(),
       summary: daySummary(ctx.state, today()),

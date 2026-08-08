@@ -69,10 +69,17 @@ index.html
        ├─ shell (sidebar, topbar, view host)
        ├─ router(ROUTES, cb)            hash routing
        ├─ applyPrefs()                  sidebar rail + tone, own storage key
+       ├─ createDeviceSwitch()          topbar: desktop / phone preview iframe
+       ├─ createNotifications(ctx)      topbar: bell, unread count, panel
+       ├─ createThemeButton()           topbar: light / dark, own storage key
        ├─ initPWA()                     service worker + install control
        ├─ buildAgent(ctx).mount()       assistant launcher (the only one)
        └─ paintView() → ROUTES[name].render(ctx, params, query) → Node
 ```
+
+The theme is applied twice: once by a five-line inline script in `index.html`, before first paint,
+so a dark reader never sees a white flash; and again by `createThemeButton()`, which owns the
+toggle from then on.
 
 `paintView()` empties `#view` and asks the active view module for a fresh node. Views are plain
 functions; there is no virtual DOM and no component lifecycle. A view that needs to redraw part of
@@ -193,7 +200,10 @@ something real to show.
 | `src/data.js` | `STORAGE_KEY`, `seedState`, `productImage`, constants, derived reads | No DOM. |
 | `src/cart.js` | `cartLines`, `cartCount`, `cartTotals`, `addToCart`, `setQty`, `clearCart`, `showCart`, `toggleCart`, `closeCart`, `stepper`, `totalRow`, `initialsOf`, `tile` | Cart state, the drawer, and the one product tile used everywhere. |
 | `src/orderops.js` | `nextStatus`, `setStatus`, `advance`, `cancelOrder`, `refundOrder`, `openOrder`, `closeOrder`, `STEP_LABEL` | Everything that mutates an order. |
-| `src/agent.js` | `buildAgent(ctx)` | 15 intents plus 4 fallbacks. |
+| `src/agent.js` | `buildAgent(ctx)` | 6 action intents, 15 reading intents, 4 fallbacks. |
+| `src/actions.js` | `actionIntents(ctx)`, `ACTION_EXAMPLES`, `READ_EXAMPLES` | The intents that write. Sentence parsers, product matching, refusals. No DOM. |
+| `src/notify.js` | `feed(state)`, `createNotifications(ctx)` | The notification list is derived from the store; only the read ids are persisted. |
+| `src/chrome.js` | `applyTheme`, `createThemeButton`, `createDeviceSwitch`, `isFramed` | Dark mode and the phone preview. Nothing app-specific beyond the storage key and the app name. |
 | `src/views/shop.js` | `render(ctx)` | Grid, filters, product modal. |
 | `src/views/checkout.js` | `render(ctx)`, `placeOrder(ctx, form)` | Three-step flow; `placeOrder` is the only writer of new orders. |
 | `src/views/track.js` | `render(ctx, params, query)`, `pillClass(status)` | Reads `?no=` from the hash query. |
@@ -219,10 +229,53 @@ Three flows do the real work, and everything else reads what they leave behind.
 
 Product edits, restocks, discount changes and settings edits are all persisted the same way.
 
+## Assistant actions
+
+Six intents change the shop instead of reporting on it. They live in `src/actions.js` and are put
+in front of the reading intents, because an instruction must never be answered as though it were a
+question.
+
+The contract, implemented in `lib/assistant.js`:
+
+```js
+answer(q, ctx) -> { text, table?, meta?, suggestions?, actions? }
+actions        -> [{ label, doingLabel?, run() }]
+run()          -> { text, table?, meta?, suggestions?, actions? }   // appended as the next reply
+```
+
+`answer()` is not allowed to write. It reads the record, works out what would change and hands back
+a button; `run()` is the only function that touches the store, and it only runs on a press. After
+writing it calls `reveal(ctx, route)`, which repaints or navigates to the screen that owns the
+record, so the change is visible behind the panel immediately.
+
+| Intent | Example sentence | What it writes |
+|---|---|---|
+| `act-restock` | `restock Karak Chai by 24` | `product.stock += n` |
+| `act-availability` | `mark Mango Lassi out of stock` / `put it back in stock with 24` | `product.stock = 0` and drops it from the cart, or back to `n` |
+| `act-price` | `change the price of Filter Coffee to 45` | `product.price` |
+| `act-stage` | `move CL-1052 to ready` | `order.status` plus one timeline entry |
+| `act-refund` | `refund CL-1049, wrong item packed` | `order.status`, `order.refund`, a timeline entry, and stock back |
+| `act-discount` | `10% off drinks until Friday, code MONSOON` | one new row in `discounts` |
+
+Three rules hold for all six:
+
+1. **Name the record.** Replies carry the product's SKU or the order number, never "the product".
+2. **Refuse ambiguity.** `matchProducts()` returns *every* product carrying the words you typed;
+   more than one and the reply says so, lists them and offers the exact records as buttons.
+3. **Refuse nonsense.** A price at or below cost, a second refund on a refunded order, a discount
+   code that already exists, a percentage over 60 — each is a plain sentence explaining why not.
+
+Matching is scored by the router in `lib/assistant.js` (regex 2, keyword 1, highest score wins,
+first intent wins a tie), so the action regexes are written to need a verb *and* its object:
+`refund` alone belongs to the reader that summarises refunds, `refund CL-1049` to the action.
+
+`ACTION_EXAMPLES` and `READ_EXAMPLES` are exported from the same module and feed both the
+"What can you do?" answer and the About this demo modal, so the two cannot drift apart.
+
 ## Assistant intents
 
-`buildAgent(ctx)` returns an `Assistant` configured with these intents. Each one reads live state,
-so answers change after you use the app.
+`buildAgent(ctx)` returns an `Assistant` configured with these reading intents too. Each one reads
+live state, so answers change after you use the app.
 
 | Intent | Matches on | Answers with |
 |---|---|---|
@@ -240,7 +293,8 @@ so answers change after you use the app.
 | `stock-value` | stock value, inventory, holding | Catalogue at cost and at shelf price |
 | `customers` | customer, repeat, biggest spender | Seven-day spend by name, repeat count |
 | `today-shape` | how is today, day so far, overview | The whole day in one paragraph |
-| `help` | what can you, help, capabilities | The list above, in plain language |
+| `help` | what can you, what do you do, capabilities | The six actions, with a worked example each |
+| `help-read` | what questions can you answer, what do you know | The reading list above, in plain language |
 
 Anything unmatched falls through to one of four fallbacks that name what the agent *can* answer.
 
@@ -304,6 +358,42 @@ is the product's own shadow rather than a surface treatment. It is scaled down f
 thumbnails and never applied to the card. Transparency costs bytes: these run 95–240KB each. They are served from this repository: the app makes no image request off-origin.
 Attribution is in `CREDITS.md`. The photographs are not covered by this repository's `LICENSE` —
 each stays under its own upstream licence, which `CREDITS.md` states plainly.
+
+## The topbar controls
+
+Three controls sit to the right of the cart, all icon-only, all with `title` and `aria-label`, all
+reachable by keyboard. "About this demo" closes the row as a labelled button — it used to be a
+`DEMO` pill, and it is no longer duplicated in the sidebar footer.
+
+**Notifications** (`src/notify.js`). `feed(state)` derives the list on every open: orders past
+`settings.prepMinutes`, orders sitting in `new`, the first six products under `settings.lowStockAt`,
+and refunds recorded today. Ids are stable strings (`late-O1042`, `stock-P004`), and only those ids
+are persisted, under `cartline.notifications.v1` — never the notices themselves, so nothing can go
+stale. Sorting is urgency first, then time inside each band. Clicking a row marks it read and
+navigates to the screen that owns it.
+
+One trap worth knowing: marking a notice read repaints the panel, which detaches the button that
+was clicked, so the outside-click listener would see a target no longer inside the panel and close
+it. The listener asks `event.composedPath()` — fixed at dispatch — instead of `contains(target)`.
+
+**Device preview** (`src/chrome.js`). Phone mode covers the page with a `.devicepv` layer on the
+brand yellow holding one `<iframe>` at exactly 390 × 844 in a dark bezel. It is an iframe on
+purpose: a `transform: scale()` mock would report the outer width to media queries and lie about
+every breakpoint. The frame is loaded with `?frame=1`; `isFramed()` reads that flag, returns `null`
+instead of the toggle and marks `<html class="is-framed">`, so a phone cannot be opened inside a
+phone. `fit()` scales the whole bezel down when the window is too short, and `Esc` or "Back to
+desktop" leaves.
+
+**Dark mode** (`src/chrome.js`). `data-theme="dark"` on `<html>` swaps the token block in
+`assets/app.css`; no filters, no per-component dark rules beyond the two exceptions below.
+`cartline.theme.v1` holds the choice, and until there is one the `prefers-color-scheme` listener
+keeps following the operating system.
+
+Two things need explicit dark rules in `cartline.css`. The brand yellow does not change in the
+dark, so everything painted on it — the sidebar, the phone surround — pins the light ink values
+back by hand (`#17181A` at 10.8:1; the near-white `--ink` it replaces was 1.9:1). And the product
+cut-outs' `drop-shadow` is ink at low alpha, invisible on a dark card, so the dark theme gives it a
+deeper black.
 
 ## The sidebar controls
 
@@ -387,6 +477,11 @@ Everything comes from `assets/app.css`. `assets/cartline.css` adds components bu
 | `--sans` / `--mono` | Inter / JetBrains Mono | UI text / numbers, labels, codes |
 | `--sidebar` / `--bar` / `--gutter` | 248 / 60 / 20 px | Shell metrics |
 
+`[data-theme="dark"]` redefines that same list and nothing else: `--bg` `#141517`, `--surface`
+`#191A1D`, the ink ramp inverted, hairlines lifted, and the status colours brightened so they still
+read on a dark ground. `--amber` and `--amber-fill` are the two tokens that do **not** move — the
+brand colour is the brand colour in both themes, and it always carries `--on-amber` ink.
+
 Rules that are not negotiable: yellow is a fill with ink on it, never text on white — use
 `--amber-deep` for that. No gradients, no blur, no glow shadows, no emoji as icons. Icons are
 inline stroke SVG using `currentColor`, from `ICONS` in `lib/ui.js`.
@@ -407,3 +502,12 @@ horizontally at 390px, and the console stays empty.
 
 Then walk the loop that matters: add to cart → checkout → the order shows on the board → advance it
 → refund it → the day summary and the assistant both change.
+
+Then walk the assistant's own loop, because it writes to the same records: ask it to restock
+something, press the button, and check the number on Products and stock; ask it to move an order
+and check the board; ask something ambiguous ("restock coffee") and confirm it refuses rather than
+guesses; reload and confirm every change is still there.
+
+And check both themes on every screen, not just the one you were working on. The places dark mode
+breaks are the ones painted on the brand yellow — the sidebar, the phone preview surround — and
+anything whose colour is written in a component rule rather than taken from a token.

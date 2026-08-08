@@ -17,6 +17,22 @@ Plain HTML, CSS and ES modules. No dependencies, no build step, no bundler, no b
 
 ---
 
+## Tech stack
+
+| Layer | What it is |
+|---|---|
+| Markup and styles | Plain HTML and CSS. One page, hash-routed. No framework, no bundler, no build step, no dependencies to install. |
+| Code | ES modules loaded straight by the browser (`<script type="module">`). |
+| State | `localStorage` — the whole shop lives under `cartline.state.v1`, with view preferences, the theme and read notifications in keys of their own. No backend, no database, no API. |
+| Icons | Inline stroke SVG using `currentColor`. No icon font, no sprite sheet. |
+| Product photography | 26 PNG cut-outs committed to `assets/products/`. No image CDN — the app makes no image request off its own origin. |
+| External requests | One: Inter and JetBrains Mono from Google Fonts. Nothing else leaves the browser. |
+| Offline and install | A service worker (`sw.js`) caching the whole shell, plus a web app manifest so it installs to the dock or home screen. |
+| Assistant | Cartline Assist is a local intent matcher over the app's own data — regular expressions, the live store, and a typing animation. There is no model and no network call. |
+
+The checkout's payment step is simulated: a timed animation with a switch to force a decline. No
+card details are asked for, taken or sent anywhere.
+
 ## What this is
 
 Cartline is an ordering and storefront application with two faces over one set of records.
@@ -90,10 +106,40 @@ total.
 ### Cartline Assist
 
 The assistant sits behind the round launcher at the bottom right, or `⌘K` / `Ctrl K` — those are
-the only two ways in. It answers from live state: today's revenue, best sellers, low stock, an
-order by its number, refund reasons, average order value, the open queue, discount usage, category
-split, the busiest hour, the week so far, stock value and customers. Place an order and ask again;
-the numbers move.
+the only two ways in.
+
+**It answers from live state:** today's revenue, best sellers, low stock, an order by its number,
+refund reasons, average order value, the open queue, discount usage, category split, the busiest
+hour, the week so far, stock value and customers. Place an order and ask again; the numbers move.
+
+**It also does things.** Six of its intents change the shop rather than report on it. Each one
+names the exact record, shows the change before and after, and refuses politely when the sentence
+is ambiguous ("two products match 'coffee' — I will not guess which one you mean"). Nothing is
+written until you press the button on its reply.
+
+| Ask it | What happens |
+|---|---|
+| `Restock Karak Chai by 24` | Names the product and its SKU, shows 18 → 42 with the stock value either side, writes it to Products and stock. |
+| `Change the price of Filter Coffee to 45` | Old price, new price, what it does to the margin. Refuses any price at or below cost. |
+| `Move CL-1052 to ready` | Pulls the order, shows preparing → ready, moves the card on the board and appends a timeline entry the customer sees. |
+| `Refund CL-1049, wrong item packed` | Customer, amount and every line first. Applying it marks the order refunded, records the reason and puts the items back into stock. With no reason given it offers the recorded reasons as buttons. |
+| `10% off drinks until Friday, code MONSOON` | Reads the size, the code and the date out of the sentence, says plainly what the demo can and cannot enforce, creates the code live on the storefront. |
+| `Mark Mango Lassi out of stock` | Stock to zero, dropped from any open cart, the storefront card flips to "Sold out". `Put Mango Lassi back in stock with 24` reverses it. |
+
+Ask **"What can you do?"** and it lists all six with an example each. The same examples are in the
+About this demo modal.
+
+---
+
+## Topbar controls
+
+| Control | What it does |
+|---|---|
+| **Notifications** | A bell with an unread count. The panel is built from the live records — orders waiting, orders past the prep promise, products under the low-stock line, refunds taken today — so it can never go stale: restock a product and its notice goes. Mark one or all read; what you have read is remembered under `cartline.notifications.v1`. |
+| **Device preview** | Desktop and phone. Phone mode covers the page with the brand yellow and runs the app inside a 390 × 844 iframe in a dark bezel — a real viewport, so the app's own breakpoints do the work rather than a scaled picture of them. The framed copy is passed `?frame=1` and hides the toggle, so there is no phone inside a phone. "Back to desktop", or `Esc`, leaves. |
+| **Dark mode** | Writes `data-theme="dark"` on `<html>` and remembers it under `cartline.theme.v1`. The first visit follows your operating system; once you pick a side, that choice sticks. The brand yellow does not change in the dark — it keeps ink text on it, everywhere it appears. |
+
+"About this demo" sits at the end of the same row and opens the modal.
 
 ---
 
@@ -154,10 +200,10 @@ data" rebuilds the shop without changing how you like the sidebar.
 | **Sidebar colour** | Switches the sidebar between the brand yellow and plain white. Yellow is the default, always with ink text — never white text on yellow. |
 | **Collapse / Expand sidebar** | Drops the sidebar to a 64px icon rail. Every label stays reachable as `title` and `aria-label`. Above 900px only: below that the sidebar is already a drawer. |
 
-The footer, top to bottom: "About this demo"; [nasvih.in](https://www.nasvih.in) and the source
-link sharing a row; then "Install app" — which only appears once the browser offers one — beside
-"Reset demo data". The link to nasvih.in is the one dark control down there; everything else is an
-outline button.
+The footer, top to bottom: [nasvih.in](https://www.nasvih.in) and **GitHub** sharing a row; then
+"Install app" — which only appears once the browser offers one — beside "Reset demo data". The link
+to nasvih.in is the one dark control down there; everything else is an outline button. "About this
+demo" is not here: it is a topbar button.
 
 ## Structure
 
@@ -177,7 +223,10 @@ outline button.
 | `src/data.js` | Seeded demo dataset and every derived read (day summary, top items, low stock). |
 | `src/cart.js` | Cart state and the cart drawer. |
 | `src/orderops.js` | Status moves, order detail drawer, cancel and refund. |
-| `src/agent.js` | Cartline Assist — 15 intents over live store state. |
+| `src/agent.js` | Cartline Assist — the reading intents, and the assistant's configuration. |
+| `src/actions.js` | The six intents that change the shop, their sentence parsers and their refusals. |
+| `src/notify.js` | The notification feed derived from the store, the bell and its panel. |
+| `src/chrome.js` | Dark mode and the phone preview frame. |
 | `src/views/*.js` | One module per screen, each exporting `render(ctx)`. |
 
 ## Demo notes
@@ -188,7 +237,9 @@ outline button.
   browser. Once you touch anything, your copy diverges — that is the point.
 - Order numbers run from `CL-1042` upwards. New checkouts continue the sequence.
 - "Reset demo data" lives in the sidebar footer and on Store settings, and rebuilds the original
-  seed. It does not touch the sidebar preferences, which live under their own key.
+  seed. It does not touch the view preferences, which live under keys of their own:
+  `cartline.chrome.v1` (sidebar colour and rail), `cartline.theme.v1` (light or dark) and
+  `cartline.notifications.v1` (which notices you have read).
 
 ## Keyboard
 
@@ -199,7 +250,7 @@ outline button.
 | `B` | Switch between storefront and operations |
 | `1`–`6` | Jump to a section in the current face |
 | `/` | Focus the search box on the current screen |
-| `Esc` | Close a drawer, modal or the mobile navigation |
+| `Esc` | Close a drawer, modal, the notifications panel, the phone preview or the mobile navigation |
 
 ## Licence
 

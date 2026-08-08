@@ -3,7 +3,7 @@
    network), and a single versioned cache so an update wipes the old one.
    Bump CACHE_VERSION whenever the file list or any cached asset changes. */
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE = `${self.registration.scope}::${CACHE_VERSION}`;
 
 /* Populated by each app: the shell files that must work offline. */
@@ -19,7 +19,10 @@ const SHELL = [
   './src/main.js',
   './src/data.js',
   './src/agent.js',
+  './src/actions.js',
   './src/cart.js',
+  './src/chrome.js',
+  './src/notify.js',
   './src/orderops.js',
   './src/views/board.js',
   './src/views/checkout.js',

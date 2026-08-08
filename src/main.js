@@ -7,6 +7,9 @@ import { STORAGE_KEY, seedState, dayKey, lowStock } from './data.js';
 import { cartCount, toggleCart, closeCart } from './cart.js';
 import { closeOrder } from './orderops.js';
 import { buildAgent } from './agent.js';
+import { ACTION_EXAMPLES, READ_EXAMPLES } from './actions.js';
+import { createNotifications } from './notify.js';
+import { createThemeButton, createDeviceSwitch, isFramed } from './chrome.js';
 import { initPWA } from '../lib/pwa.js';
 
 import renderShop from './views/shop.js';
@@ -65,6 +68,8 @@ const SOURCE_URL = 'https://github.com/nasvih/cartline-ordering-storefront-app';
 const TONE_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" stroke="none"/></svg>';
 /* a panel with its side column — the collapse control */
 const RAIL_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8.5 4v12"/></svg>';
+/* an i in a circle — the About control that replaced the DEMO pill */
+const INFO_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 9v4.5"/><path d="M10 6.4h.01"/></svg>';
 
 const app = qs('#app');
 app.appendChild(h('div', { class: 'shell' },
@@ -86,11 +91,8 @@ app.appendChild(h('div', { class: 'shell' },
         }))),
     h('nav', { class: 'side__nav', id: 'nav', 'aria-label': 'Sections' }),
     h('div', { class: 'side__foot' },
-      h('button', {
-        class: 'btn btn--block', type: 'button', id: 'aboutbtn',
-        style: 'margin-bottom:6px', title: 'About this demo', 'aria-label': 'About this demo',
-        html: `${icon('eye')}<span>About this demo</span>`,
-      }),
+      /* "About this demo" is a topbar control, not a sidebar one — it opens
+         from the button beside the notifications bell. */
       h('div', { class: 'side__pair', style: 'margin-bottom:6px' },
         h('a', {
           class: 'btn sitelink', id: 'sitelink',
@@ -102,9 +104,9 @@ app.appendChild(h('div', { class: 'shell' },
         h('a', {
           class: 'btn', id: 'sourcelink',
           href: SOURCE_URL, target: '_blank', rel: 'noopener noreferrer',
-          title: 'Source on GitHub — opens in a new tab',
-          'aria-label': 'Source on GitHub, opens in a new tab',
-          html: `${SOURCE_ICON}<span>Source</span>`,
+          title: 'GitHub — opens in a new tab',
+          'aria-label': 'GitHub, opens in a new tab',
+          html: `${SOURCE_ICON}<span>GitHub</span>`,
         })),
       /* the install control is added here at runtime, before Reset, and stays
          hidden until the browser offers an install — so this row is one
@@ -128,16 +130,18 @@ app.appendChild(h('div', { class: 'shell' },
         h('span', { class: 'topbar__sub', id: 'sub' }, 'Storefront')),
       h('div', { class: 'spacer' }),
       h('div', { class: 'faceswitch', id: 'faceswitch', role: 'group', 'aria-label': 'Switch between the storefront and operations' }),
+      h('div', { class: 'topbar__tools', id: 'tools' },
+        h('button', {
+          class: 'btn btn--ghost btn--icon cartbtn', id: 'cartbtn',
+          'aria-label': 'Open cart', title: 'Cart',
+          html: `${icon('cart')}<span class="cartbtn__count" id="cartcount" hidden>0</span>`,
+        })),
       h('button', {
-        class: 'btn btn--ghost btn--icon cartbtn', id: 'cartbtn',
-        'aria-label': 'Open cart', html: `${icon('cart')}<span class="cartbtn__count" id="cartcount" hidden>0</span>`,
-      }),
-      h('button', {
-        class: 'pill pill--amber', type: 'button', id: 'demopill',
-        style: 'cursor:pointer',
-        title: 'Everything in Cartline is local sample data. Orders, stock and payments are simulated in this browser. Open for detail.',
+        class: 'btn btn--ghost aboutbtn', type: 'button', id: 'demopill',
+        title: 'About this demo — everything here is local sample data, and orders, stock and payments are simulated in this browser',
         'aria-label': 'About this demo',
-      }, 'Demo')),
+        html: `${INFO_ICON}<span>About this demo</span>`,
+      })),
     h('main', { class: 'view view--pad', id: 'view', tabindex: '-1' }))));
 
 const shellEl = qs('.shell');
@@ -222,26 +226,36 @@ function aboutDemo() {
         h('h4', {}, 'How it would work for real'),
         h('p', { class: 'muted small' }, 'The same interface, with browser storage swapped for a real database, a real payment provider in place of the simulated step, staff accounts so actions are attributable, and printing or a counter display for the kitchen. What you are looking at is the interface and the workflow, not the production system behind them.')),
       h('section', {},
+        h('h4', {}, 'Ask the assistant to do it'),
+        h('p', { class: 'muted small' }, 'Cartline Assist reads this store and changes it. Type one of these into the launcher at the bottom right; it names the exact record, shows you the before and after, and waits for you to press the button before anything is written.'),
+        h('div', { class: 'exlist' }, ACTION_EXAMPLES.map((e) => h('div', { class: 'ex' },
+          h('div', { class: 'ex__ask mono' }, e.ask),
+          h('div', { class: 'ex__out muted small' }, e.reply)))),
+        h('p', { class: 'muted small', style: 'margin-top:12px' }, 'It answers questions from the same records, with today\'s numbers rather than a canned reply:'),
+        h('div', { class: 'exlist' }, READ_EXAMPLES.map((e) => h('div', { class: 'ex' },
+          h('div', { class: 'ex__ask mono' }, e.ask),
+          h('div', { class: 'ex__out muted small' }, e.reply))))),
+      h('section', {},
         h('h4', {}, 'How this demo works'),
         h('ul', { class: 'muted small ticks' },
           h('li', {}, 'You can actually use it. Place an order, move it across the board, edit a product, change a price, pause a discount code or refund an order — every screen writes to the store the others read.'),
           h('li', {}, `Your data stays on your machine, in this browser's local storage under ${STORAGE_KEY}. There is no account and no backend. "Reset demo data" clears it, and it does not sync between browsers or devices.`),
           h('li', {}, 'The payment step is simulated. No card details are asked for, taken or sent anywhere.'),
-          h('li', {}, "Cartline Assist is simulated too. It answers by matching your question against this app's own demo data — a demonstration of the interaction, not a connected model."))),
+          h('li', {}, "Cartline Assist is simulated too. It answers, and acts, by matching what you type against this app's own demo data — a demonstration of the interaction, not a connected model."),
+          h('li', {}, 'The topbar carries three view controls: notifications built from the live records, a phone preview that runs the app inside a 390 by 844 frame, and a dark mode that follows your system until you pick a side.'))),
       h('section', {},
         h('p', { class: 'muted small' }, 'The source is published so it can be read and evaluated. It is not open source: copying, modifying, redistributing or reusing it needs written permission.'),
         h('a', {
           class: 'btn', style: 'margin-top:10px',
           href: SOURCE_URL, target: '_blank', rel: 'noopener noreferrer',
-          'aria-label': 'Source on GitHub, opens in a new tab',
-          html: `${SOURCE_ICON}<span>Source on GitHub</span>`,
+          'aria-label': 'GitHub, opens in a new tab',
+          html: `${SOURCE_ICON}<span>GitHub</span>`,
         }))),
     actions: [{ label: 'Close', class: 'btn--primary' }],
   });
 }
 
 qs('#demopill').addEventListener('click', aboutDemo);
-qs('#aboutbtn').addEventListener('click', aboutDemo);
 qs('#resetbtn').addEventListener('click', async () => {
   const ok = await confirmDialog(
     'This clears every order, product edit and discount change you made here and rebuilds the original sample data.',
@@ -353,14 +367,31 @@ nav = router(
     closeCart();
     closeOrder();
     paintView();
-    viewEl.scrollIntoView({ block: 'start' });
+    /* back to the top of the page, not to the top of the view — scrolling the
+       view into place puts its first heading under the sticky topbar, which is
+       obvious the moment the app is narrow (the phone preview shows it best) */
+    window.scrollTo({ top: 0 });
   },
 );
+
+/* ---------- topbar controls ----------
+   Device preview, notifications and dark mode sit together on the right of
+   the topbar, after the cart. The framed copy of the app marks itself so the
+   device toggle cannot be opened inside its own preview. */
+
+if (isFramed()) document.documentElement.classList.add('is-framed');
+
+const tools = qs('#tools');
+const deviceSwitch = createDeviceSwitch({ appName: 'Cartline' });
+if (deviceSwitch) tools.insertBefore(deviceSwitch, qs('#cartbtn'));
+const notifications = createNotifications(ctx);
+tools.appendChild(notifications.node);
+tools.appendChild(createThemeButton());
 
 buildNav();
 buildFaceSwitch();
 nav.go();
-store.subscribe(() => syncChrome());
+store.subscribe(() => { syncChrome(); notifications.sync(); });
 
 /* ---------- installable ---------- */
 
