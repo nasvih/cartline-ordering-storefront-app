@@ -84,7 +84,7 @@ export function buildAgent(ctx) {
     },
     {
       id: 'order-status',
-      match: [/\bCL[- ]?\d+/i, /order\s+#?\d{3,}/i, /where is (my )?order|order status|track/i],
+      match: [/\bCL[- ]?\d+/i, /order\s+#?\d{3,}/i, /where is (my )?order|order status|track|order number|order by number|look ?up an order|find an order/i],
       trace: 'looked the order up by number',
       answer: (q) => {
         const m = q.match(/\d{3,}/);
@@ -260,7 +260,7 @@ export function buildAgent(ctx) {
     },
     {
       id: 'stock-value',
-      match: [/stock value|inventory|how much stock|worth of stock|holding/i, 'stock value'],
+      match: [/stock value|inventory|how much stock|worth of stock|holding/i, 'stock', 'stock value'],
       trace: 'valued every product line at cost and at retail',
       answer: () => {
         const ps = ctx.state.products;
@@ -337,9 +337,9 @@ export function buildAgent(ctx) {
     intents,
     fallbacks: [
       'I could not match that to anything in the store data. Try "what is today\'s revenue" and I will pull the day summary.',
-      'That one is outside what this build answers. Ask me about stock, an order number, refunds or the busiest hour.',
-      'No intent for that yet. I do know today\'s takings, best sellers, low stock and every order by number.',
-      'I only answer from this store\'s own records. Ask about a discount code, a category, or how the week is going.',
+      'That one is outside what this build answers. Try "what is low on stock" or "where is order CL-1052".',
+      'No intent for that yet. I do answer "what sold best today", "show the open orders" and "how does this week look".',
+      'I only answer from this store\'s own records. Try "which discount code costs most" or "which category earns most".',
     ],
     note: 'Simulated agent — answers are matched against this app\'s own demo data in your browser. No request leaves this device.',
     context: () => ({
