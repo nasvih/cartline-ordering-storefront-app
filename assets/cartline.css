@@ -42,15 +42,22 @@
 .tone-5{background:var(--bad-soft);color:var(--bad);border-color:var(--bad-line)}
 .tone-6{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
 
-/* The photograph sits in the same box as the colour tile, contained rather
-   than cropped and centred both ways with even padding, so a tall bottle and
-   a wide plate read as one set. It stays a quiet part of the card — the name
-   and the price still lead. If the file ever fails to load the img is dropped
-   and .tile--photo comes off, so the colour tile shows again. */
+/* Every photograph is the product cut out of its shot — a transparent PNG with
+   no background of its own — so the app's white surface is the background and
+   a tall bottle and a wide plate read as one set. It is contained rather than
+   cropped and centred both ways with even padding. It stays a quiet part of
+   the card: the name and the price still lead. If the file ever fails to load
+   the img is dropped and .tile--photo comes off, so the colour tile shows again.
+
+   drop-shadow follows the PNG's alpha, so it draws under the object itself
+   rather than around a box — that is what grounds a cut-out on the surface and
+   stops it floating. This is the one blur the design rules allow: it is the
+   product's own shadow, not a surface treatment, so it stays low-opacity and
+   tightly blurred, and it never goes on the card. */
 .tile--photo{background:var(--surface);border-color:var(--line);color:transparent}
-.tile__img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88px;height:88px;object-fit:contain;object-position:center center;display:block}
-.tile--lg .tile__img{width:126px;height:126px}
-.tile--sm .tile__img{width:32px;height:32px}
+.tile__img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88px;height:88px;object-fit:contain;object-position:center center;display:block;filter:drop-shadow(0 3px 4px rgba(23,24,26,.17))}
+.tile--lg .tile__img{width:126px;height:126px;filter:drop-shadow(0 5px 7px rgba(23,24,26,.16))}
+.tile--sm .tile__img{width:32px;height:32px;filter:drop-shadow(0 1px 1.5px rgba(23,24,26,.18))}
 
 .qty{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
 .qty button{width:28px;height:28px;border:0;background:none;cursor:pointer;color:var(--ink);display:grid;place-items:center}

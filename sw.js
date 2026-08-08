@@ -3,7 +3,7 @@
    network), and a single versioned cache so an update wipes the old one.
    Bump CACHE_VERSION whenever the file list or any cached asset changes. */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = `${self.registration.scope}::${CACHE_VERSION}`;
 
 /* Populated by each app: the shell files that must work offline. */
@@ -33,32 +33,32 @@ const SHELL = [
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
-  './assets/products/banana-chips-200g.jpg',
-  './assets/products/butter-croissant.jpg',
-  './assets/products/chicken-biryani.jpg',
-  './assets/products/coconut-loaf.jpg',
-  './assets/products/coconut-oil-1l.jpg',
-  './assets/products/coffee-powder-500g.jpg',
-  './assets/products/date-pudding.jpg',
-  './assets/products/date-roll.jpg',
-  './assets/products/filter-coffee.jpg',
-  './assets/products/fish-curry-meal.jpg',
-  './assets/products/karak-chai.jpg',
-  './assets/products/kerala-mixture-250g.jpg',
-  './assets/products/kuboos-wrap.jpg',
-  './assets/products/lime-mint-cooler.jpg',
-  './assets/products/malabar-bun.jpg',
-  './assets/products/mango-lassi.jpg',
-  './assets/products/masala-peanuts.jpg',
-  './assets/products/matta-rice-5kg.jpg',
-  './assets/products/paneer-rice-bowl.jpg',
-  './assets/products/payasam-cup.jpg',
-  './assets/products/samosa-2-pcs.jpg',
-  './assets/products/sulaimani-tea.jpg',
-  './assets/products/tender-coconut-souffle.jpg',
-  './assets/products/toor-dal-1kg.jpg',
-  './assets/products/veg-meals-box.jpg',
-  './assets/products/wheat-rusk-200g.jpg',
+  './assets/products/banana-chips-200g.png',
+  './assets/products/butter-croissant.png',
+  './assets/products/chicken-biryani.png',
+  './assets/products/coconut-loaf.png',
+  './assets/products/coconut-oil-1l.png',
+  './assets/products/coffee-powder-500g.png',
+  './assets/products/date-pudding.png',
+  './assets/products/date-roll.png',
+  './assets/products/filter-coffee.png',
+  './assets/products/fish-curry-meal.png',
+  './assets/products/karak-chai.png',
+  './assets/products/kerala-mixture-250g.png',
+  './assets/products/kuboos-wrap.png',
+  './assets/products/lime-mint-cooler.png',
+  './assets/products/malabar-bun.png',
+  './assets/products/mango-lassi.png',
+  './assets/products/masala-peanuts.png',
+  './assets/products/matta-rice-5kg.png',
+  './assets/products/paneer-rice-bowl.png',
+  './assets/products/payasam-cup.png',
+  './assets/products/samosa-2-pcs.png',
+  './assets/products/sulaimani-tea.png',
+  './assets/products/tender-coconut-souffle.png',
+  './assets/products/toor-dal-1kg.png',
+  './assets/products/veg-meals-box.png',
+  './assets/products/wheat-rusk-200g.png',
 ];
 
 self.addEventListener('install', (event) => {

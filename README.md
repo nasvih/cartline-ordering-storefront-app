@@ -135,6 +135,11 @@ hotlinked — the app makes no image request off its own origin. Photographer, s
 each one are listed in [CREDITS.md](CREDITS.md). They are not covered by this repository's licence —
 each photograph stays under its own upstream licence and belongs to the photographer credited there.
 
+Each file is the product cut out of its photograph — a 600px square PNG with a transparent
+background — so a tile shows the object and nothing else, sitting on the app's own white surface
+under a soft shadow that CSS draws from the PNG's alpha. `CREDITS.md` records that every one of
+them was edited this way, and which ten photographs were swapped to get a clean cut-out.
+
 A product with no photograph keeps the solid colour tile carrying its initials, and a photograph
 that fails to load falls back to the same tile, so the grid never shows a hole.
 
@@ -161,7 +166,7 @@ outline button.
 | `index.html` | The only page. Fonts, stylesheets, `#app` mount, `noscript` line. |
 | `assets/app.css` | Shared design system: tokens, shell, buttons, tables, forms, modal, assistant. |
 | `assets/cartline.css` | App-specific components only — product tiles and photographs, cart lines, checkout steps, board columns. |
-| `assets/products/*.jpg` | The 26 product photographs, 600px square. See `CREDITS.md`. |
+| `assets/products/*.png` | The 26 product cut-outs, 600px square with a transparent background. See `CREDITS.md`. |
 | `assets/icons/*.png` | Installed-app icons, 192 and 512, plus a maskable 512. |
 | `manifest.webmanifest` | Web app manifest — name, icons, colours, standalone display. |
 | `sw.js` | Service worker: caches the app and its photographs for offline use. |

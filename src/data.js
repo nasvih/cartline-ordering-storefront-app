@@ -63,42 +63,45 @@ const PRODUCTS = [
 ];
 
 /* Product photography. Every file lives in this repository under
-   assets/products/, so the page makes no image request off-origin. A product
-   with no entry here keeps the solid colour tile, which is the fallback
-   whenever a photograph would be worse than the tile. Credits: CREDITS.md. */
+   assets/products/, so the page makes no image request off-origin. Each one is
+   the product cut out of its photograph — a transparent PNG carrying the object
+   and nothing else, so the app's own white surface is the background and the
+   grid reads as one set. A product with no entry here keeps the solid colour
+   tile, which is also the fallback if a file fails to load. Credits:
+   CREDITS.md, which records which shots were cut out and which came isolated. */
 const PRODUCT_IMAGES = {
-  P001: ['malabar-bun', 'Sliced bread on a wooden board against a white background'],
-  P002: ['butter-croissant', 'A butter croissant on a white background'],
-  P003: ['coconut-loaf', 'Slices of a baked loaf on a white background'],
-  P004: ['date-roll', 'A rolled pastry on a plain background'],
-  P005: ['wheat-rusk-200g', 'A stack of dry twice-baked rusk toast slices on a white plate against a white background'],
-  P006: ['chicken-biryani', 'A single white plate of spiced biryani rice seen from above on a plain white background'],
-  P007: ['veg-meals-box', 'A white plate of steamed rice served beside a lentil curry on a plain light background'],
-  P008: ['kuboos-wrap', 'Filled flatbread wraps on a plain background'],
-  P009: ['fish-curry-meal', 'A bowl of curry with curry leaves on a plain background'],
-  P010: ['paneer-rice-bowl', 'A white bowl of paneer cubes in a spiced sauce with spring onion, on a plain white background'],
-  P011: ['sulaimani-tea', 'A glass of black tea held against a white background'],
-  P012: ['filter-coffee', 'A cup of black coffee seen from above on white'],
-  P013: ['lime-mint-cooler', 'A citrus cooler with mint in a tall glass on white'],
-  P014: ['mango-lassi', 'A yellow fruit drink in a glass on a white background'],
-  P015: ['karak-chai', 'A cup of milky tea seen from above on a pale surface'],
-  P016: ['banana-chips-200g', 'A white bowl of crisps on a white background'],
-  P017: ['kerala-mixture-250g', 'Mixed pulses and nuts scattered on a white surface'],
-  P018: ['samosa-2-pcs', 'Golden fried samosas on a white plate against a white background'],
-  P020: ['masala-peanuts', 'Roasted peanuts scattered on a pale marble surface'],
-  P021: ['matta-rice-5kg', 'A bowl of red grains on a white background'],
-  P022: ['coconut-oil-1l', 'A bottle of cooking oil on a white background'],
-  P023: ['coffee-powder-500g', 'A white bowl of coffee beans on a white background'],
-  P024: ['toor-dal-1kg', 'Dried yellow split lentils filling the frame'],
-  P025: ['payasam-cup', 'A single white cup of pale set milk pudding topped with mint, on a white background'],
-  P026: ['date-pudding', 'A layered pastry dessert on a white plate'],
-  P027: ['tender-coconut-souffle', 'A pale coconut set dessert in a glass topped with toasted coconut flakes, on a soft light background'],
+  P001: ['malabar-bun', 'A cluster of baked bread rolls'],
+  P002: ['butter-croissant', 'A butter croissant'],
+  P003: ['coconut-loaf', 'Three slices of a baked loaf'],
+  P004: ['date-roll', 'A rolled filled pastry'],
+  P005: ['wheat-rusk-200g', 'A stack of dry twice-baked rusk toast slices'],
+  P006: ['chicken-biryani', 'A plate of spiced biryani rice seen from above'],
+  P007: ['veg-meals-box', 'A plate of steamed rice served beside a lentil curry'],
+  P008: ['kuboos-wrap', 'A filled flatbread wrap'],
+  P009: ['fish-curry-meal', 'A bowl of curry served with rice'],
+  P010: ['paneer-rice-bowl', 'A bowl of paneer cubes in a spiced sauce'],
+  P011: ['sulaimani-tea', 'A glass of black tea on a saucer'],
+  P012: ['filter-coffee', 'A cup of black coffee seen from above'],
+  P013: ['lime-mint-cooler', 'A citrus cooler with mint in a tall glass'],
+  P014: ['mango-lassi', 'A yellow fruit drink in a tall glass'],
+  P015: ['karak-chai', 'A mug of milky spiced tea seen from above'],
+  P016: ['banana-chips-200g', 'A bowl of crisps with a few spilled beside it'],
+  P017: ['kerala-mixture-250g', 'A bowl of crunchy savoury snack mix'],
+  P018: ['samosa-2-pcs', 'Golden fried samosas'],
+  P020: ['masala-peanuts', 'A bowl of roasted peanuts'],
+  P021: ['matta-rice-5kg', 'Red parboiled rice grains'],
+  P022: ['coconut-oil-1l', 'A bottle of cooking oil'],
+  P023: ['coffee-powder-500g', 'A bowl of roasted coffee beans'],
+  P024: ['toor-dal-1kg', 'A bowl heaped with dried yellow split lentils'],
+  P025: ['payasam-cup', 'A footed glass of milk pudding topped with pistachios'],
+  P026: ['date-pudding', 'A slice of dark layered sponge cake on a plate'],
+  P027: ['tender-coconut-souffle', 'A small pale set pudding on a saucer with a spoon'],
 };
 
 /** Photo for a product, or null when it should keep its colour tile. */
 export function productImage(p) {
   const rec = p && PRODUCT_IMAGES[typeof p === 'string' ? p : p.id];
-  return rec ? { src: `./assets/products/${rec[0]}.jpg`, alt: rec[1] } : null;
+  return rec ? { src: `./assets/products/${rec[0]}.png`, alt: rec[1] } : null;
 }
 
 const CUSTOMERS = [

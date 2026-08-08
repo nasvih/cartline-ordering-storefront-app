@@ -295,9 +295,13 @@ operations table. It renders the solid colour tile with the product's initials, 
 photograph over it when there is one. An `error` listener removes the `img` and the `tile--photo`
 class, so a missing file degrades to the tile rather than to a broken image.
 
-Photographs are 600px square JPEGs under 80KB, `object-fit: contain` inside a fixed square frame
-(88px in the grid, 126px in the modal, 32px in a row), centred, so a tall bottle and a wide plate
-read as one set. They are served from this repository: the app makes no image request off-origin.
+Photographs are 600px square PNGs with a transparent background — the product cut out of its
+shot, nothing behind it — `object-fit: contain` inside a fixed square frame (88px in the grid,
+126px in the modal, 32px in a row), centred with even padding, so a tall bottle and a wide plate
+read as one set. `.tile__img` carries a `drop-shadow` filter, which follows the alpha and so draws
+under the object rather than around a box; that is the one blur the design rules allow, because it
+is the product's own shadow rather than a surface treatment. It is scaled down for the 32px
+thumbnails and never applied to the card. Transparency costs bytes: these run 95–240KB each. They are served from this repository: the app makes no image request off-origin.
 Attribution is in `CREDITS.md`. The photographs are not covered by this repository's `LICENSE` —
 each stays under its own upstream licence, which `CREDITS.md` states plainly.
 
