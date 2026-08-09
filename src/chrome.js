@@ -14,7 +14,7 @@
 import { h } from '../lib/ui.js';
 
 const THEME_KEY = 'cartline.theme.v1';
-const THEME_COLOR = { light: '#EAC81C', dark: '#141517' };
+const THEME_COLOR = { light: '#C24A1C', dark: '#141517' };
 
 /* sun with rays / crescent moon — one glyph each, no emoji */
 const SUN_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 2v2M10 16v2M18 10h-2M4 10H2M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4M15.7 15.7l-1.4-1.4M5.7 5.7L4.3 4.3"/></svg>';
@@ -80,7 +80,7 @@ const PHONE_H = 844;
 const BEZEL = 13;
 
 /**
- * Two icon buttons in the topbar. Phone mode covers the page with a yellow
+ * Two icon buttons in the topbar. Phone mode covers the page with a terracotta
  * surround holding one iframe of this app at exactly 390 × 844.
  * Returns null when this copy is already the framed one.
  */

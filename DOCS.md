@@ -412,9 +412,10 @@ should be. `applyPrefs()` only ever adds the class when `matchMedia('(min-width:
 and re-runs on the media query's `change` event; `cartline.css` hides `.railbtn` under 900px and
 re-states the single-column grid there as a second line of defence.
 
-The yellow sidebar is the default. `.side[data-tone="amber"]` keeps every text colour on the ink
-side — `--ink` at 10.8:1 and `--amber-darker` at 4.4:1 on `#EAC81C`. There is no white text on
-yellow anywhere. `.hint` is darkened to `--ink-2` because `--faint` only reaches 3.1:1 there.
+The terracotta sidebar is the default, and its polarity is the opposite of the kit's. `#C24A1C` is
+a dark ground, so `.side[data-tone="amber"]` carries **white** text — ink on it would be 3.6:1. The
+full-bleed surfaces use the deeper `--amber-fill-hi` `#A74018` (white 6.2:1) so the quiet mono
+labels still clear AA at 5.0:1; on the fill itself they could not.
 
 ## Installing
 
@@ -466,16 +467,20 @@ Everything comes from `assets/app.css`. `assets/cartline.css` adds components bu
 |---|---|---|
 | `--bg`, `--surface` | `#FFFFFF` | Page and card ground |
 | `--surface-2` | `#FAFAF8` | Table headers, board columns, assistant log |
-| `--hover` | `#FEFBEA` | Row and button hover |
+| `--hover` | `#FEF6F0` | Row and button hover |
 | `--ink` / `--ink-2` / `--muted` / `--faint` | `#17181A` / `#2E3033` / `#5A5F66` / `#686E75` | Text ramp |
 | `--line` / `--line-2` | `#E7E7E4` / `#D8D8D3` | Hairlines and control borders |
-| `--amber` / `--amber-fill` | `#EAC81C` | Brand fill — always with `--on-amber` ink on top |
-| `--amber-deep` | `#8A6D00` | Brand colour as *text* on white |
-| `--amber-soft` / `--amber-line` | `#FEF9DA` / `#F0DE8C` | Active nav, accent stats, banners |
+| `--amber` / `--amber-fill` | `#C24A1C` | Brand fill — always with `--on-amber` **white** on top, 4.9:1 |
+| `--amber-deep` | `#9E4718` | Brand colour as *text* on white, 6.2:1 |
+| `--amber-soft` / `--amber-line` | `#FCEDE3` / `#F0C6A8` | Active nav, accent stats, banners |
 | `--ok` / `--warn` / `--bad` / `--info` (+ `-soft`, `-line`) | | Status pills, tiles, meters |
 | `--r-lg` / `--r` / `--r-sm` / `--r-xs` | 12 / 8 / 6 / 4 px | Radii |
 | `--sans` / `--mono` | Inter / JetBrains Mono | UI text / numbers, labels, codes |
 | `--sidebar` / `--bar` / `--gutter` | 248 / 60 / 20 px | Shell metrics |
+
+The tokens are still named `--amber-*`. That is the shared kit's name for the accent slot, and
+keeping it means this app overrides seven values rather than renaming the accent across every
+file in the suite. Read them as "the accent", not as "yellow".
 
 `[data-theme="dark"]` redefines that same list and nothing else: `--bg` `#141517`, `--surface`
 `#191A1D`, the ink ramp inverted, hairlines lifted, and the status colours brightened so they still

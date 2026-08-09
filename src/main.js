@@ -166,7 +166,7 @@ qs('#sidescrim').addEventListener('click', () => setSide(false));
 
 /* ---------- sidebar shape and colour ----------
    Kept in its own localStorage key so "Reset demo data" rebuilds the shop
-   without also throwing away how you like the sidebar. The sidebar is yellow
+   without also throwing away how you like the sidebar. The sidebar is terracotta
    until you say otherwise; the rail only exists above 900px, because below
    that the sidebar is a full-width drawer and a 64px rail would be useless. */
 

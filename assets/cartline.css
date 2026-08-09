@@ -2,9 +2,44 @@
    Cartline — app-specific components.
    Loaded after app.css. Uses only the tokens defined there:
    solid fills, hairline borders, no gradients, no blur, no glow.
-   1 topbar extras · 2 storefront · 3 cart · 4 checkout
+   0 accent · 1 topbar extras · 2 storefront · 3 cart · 4 checkout
    5 order board · 6 order detail · 7 tables + inventory · 8 summary
    ============================================================ */
+
+/* == 0. accent ==
+   Cartline's accent is terracotta, not the kit's yellow. app.css is the shared
+   kit copy and is never edited; the token NAMES stay exactly as the kit
+   declares them so every rule in it keeps working, and only the VALUES change
+   here. The structure is unchanged too: --amber / --amber-fill is a FILL,
+   --amber-deep and --amber-darker are the readable shades on white,
+   --amber-soft and --amber-line are the tint and hairline for selected states,
+   --on-amber is what sits on top of the fill.
+
+   One consequence follows from the hue and cannot be avoided: yellow is a
+   light fill and carried ink text, terracotta is a dark one and carries white.
+   #FFFFFF on #C24A1C is 4.89:1; the ink it replaces would have been 3.63:1.
+   Everywhere a full surface is painted in the brand — the tone sidebar, the
+   phone-preview ground — the deeper shade #A74018 is used instead, because
+   white reaches 6.20:1 there and the quiet mono labels clear AA at 4.98:1,
+   which they cannot manage on #C24A1C.
+
+   Contrast on white: --amber-deep 6.23:1, --amber-darker 9.10:1.
+   In the dark palette on --surface: --amber-deep 8.41:1, --amber-darker
+   11.16:1. Solid colours throughout — no gradients, no blur, no glow. */
+:root{
+  --hover:#FEF6F0;
+  --amber:#C24A1C;       --amber-deep:#9E4718;   --amber-darker:#7A330E;
+  --amber-fill:#C24A1C;  --amber-fill-hi:#A74018;
+  --amber-soft:#FCEDE3;  --amber-line:#F0C6A8;   --on-amber:#FFFFFF;
+}
+[data-theme="dark"]{
+  --hover:#2B1E15;
+  --amber-soft:#2E1B10;  --amber-line:#4F2D19;
+  --amber-deep:#F2A268;  --amber-darker:#F7C5A2;
+}
+/* the kit selects with ink on the fill, which yellow could carry and
+   terracotta cannot — the selection takes --on-amber like every other fill */
+::selection{background:var(--amber-fill);color:var(--on-amber)}
 
 /* == 1. topbar extras == */
 .faceswitch{display:inline-flex;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:var(--surface)}
@@ -146,10 +181,49 @@
 .ticks li{position:relative;padding-left:16px;margin-top:5px;line-height:1.5}
 .ticks li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;background:var(--amber);border-radius:1px}
 
+/* == 8b. brand sidebar ==
+   The kit builds its tone sidebar for a light yellow ground: it paints ink on
+   the fill, hairlines it with dark rgba, and re-pins the light palette inside
+   the subtree in dark mode because yellow stays a light surface. Terracotta is
+   the opposite — a dark surface — so the whole subtree flips once, for both
+   themes, and the dark-mode special case disappears with it.
+
+   The ground is the deeper brand shade: white on #A74018 is 6.20:1 and the
+   quiet mono labels reach 4.98:1, neither of which holds on #C24A1C. Re-
+   pinning --ink and friends inside the subtree is what makes the kit's own
+   rules land correctly; only the handful that hard-code a colour, or that
+   would put white on the white active row, are restated below. */
+.side[data-tone="amber"],
+[data-theme="dark"] .side[data-tone="amber"]{
+  --ink:#FFFFFF;         --ink-2:#FAEFE9;        --muted:#F5E3D9;
+  --faint:#F5E3D9;
+  --bg:#FFFFFF;          --surface:#FFFFFF;      --surface-2:#FFFFFF;
+  --line:rgba(255,255,255,.26); --line-2:rgba(255,255,255,.34);
+  --hover:rgba(255,255,255,.14);
+  --amber-deep:#9E4718;  --amber-darker:#F7C5A2;
+  background:var(--amber-fill-hi);border-right-color:#8C3512;
+}
+.side[data-tone="amber"] .side__brand,
+.side[data-tone="amber"] .side__foot,
+.side[data-tone="amber"] .navgroup+.navgroup{border-color:rgba(255,255,255,.26)}
+/* the mark inverts on the brand ground: white tile, terracotta glyph, 6.20:1 */
+.side[data-tone="amber"] .mark{background:#FFFFFF;color:var(--amber-fill-hi)}
+.side[data-tone="amber"] .navlink:hover{background:rgba(255,255,255,.14)}
+/* the active row is the page ground brought into the sidebar, so it is the one
+   place in here that keeps ink — 17.8:1 on white */
+.side[data-tone="amber"] .navlink.is-active{background:#FFFFFF;color:#17181A}
+.side[data-tone="amber"] .navlink.is-active svg{color:var(--amber-deep)}
+.side[data-tone="amber"] .btn,
+.side[data-tone="amber"] .side__brandbtns .btn{background:rgba(255,255,255,.9);border-color:rgba(255,255,255,.5);color:#17181A}
+.side[data-tone="amber"] .btn:hover,
+.side[data-tone="amber"] .side__brandbtns .btn:hover{background:#FFFFFF;border-color:#FFFFFF}
+/* the kit's focus ring is --amber, which disappears into the terracotta */
+.side[data-tone="amber"] :focus-visible{outline-color:#FFFFFF}
+
 /* == sidebar footer link out ==
    The one dark element in the sidebar, so it reads as a way out of the demo
-   whether the sidebar is yellow or white. White on #17181A is 15.9:1. The
-   selectors carry the .side prefix because the yellow sidebar restyles .btn
+   whether the sidebar is terracotta or white. White on #17181A is 15.9:1. The
+   selectors carry the .side prefix because the brand sidebar restyles .btn
    at two levels of specificity and would otherwise wash this one out. */
 .side .sitelink,
 .side[data-tone="amber"] .sitelink{background:var(--night);border-color:var(--night);color:#fff;text-decoration:none}
@@ -160,8 +234,8 @@
    14px side padding truncates "nasvih.in" to an ellipsis, so tighten it */
 .side__foot .side__pair .btn{padding-left:9px;padding-right:9px;gap:6px}
 .shell.is-rail .side__foot .side__pair .btn{padding-left:0;padding-right:0}
-/* the footnote is --faint, which only reaches 3.1:1 on #EAC81C — ink-2 on
-   yellow is 9.2:1, so the yellow sidebar darkens it. */
+/* the footnote is --faint; on the terracotta ground the subtree's --ink-2
+   (#FAEFE9, 5.5:1) is the readable one. */
 .side[data-tone="amber"] .hint{color:var(--ink-2)}
 
 /* == 9. topbar tools: device preview, notifications, dark mode == */
@@ -191,17 +265,19 @@
 .notif__read{flex:none;width:30px;height:30px;padding:0;margin-top:5px}
 
 /* == 10. phone preview ==
-   The app inside an iframe at 390 × 844, in a dark bezel on the brand yellow.
-   The frame is a real viewport, so the app's own breakpoints do the work. */
-.devicepv{position:fixed;inset:0;z-index:78;display:flex;flex-direction:column;align-items:center;padding:18px 16px 30px;overflow:auto;background:var(--amber-fill);color:var(--ink)}
+   The app inside an iframe at 390 × 844, in a dark bezel on the brand ground.
+   The frame is a real viewport, so the app's own breakpoints do the work.
+   Like the sidebar this is a full brand surface, so it takes the deeper shade
+   and white text: 6.20:1 for the title, 5.48:1 for the note. */
+.devicepv{position:fixed;inset:0;z-index:78;display:flex;flex-direction:column;align-items:center;padding:18px 16px 30px;overflow:auto;background:var(--amber-fill-hi);color:#FFFFFF}
 .devicepv__bar{width:100%;max-width:900px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .devicepv__id{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .devicepv__name{font-size:18px;font-weight:700;letter-spacing:-.02em}
-.devicepv__size{font-size:11px;letter-spacing:.08em;color:var(--ink-2)}
-.devicepv__note{width:100%;max-width:74ch;font-size:12.5px;line-height:1.5;color:var(--ink-2);margin-bottom:16px}
-.devicepv .btn{background:rgba(255,255,255,.82);border-color:rgba(23,24,26,.2);color:var(--ink)}
-.devicepv .btn:hover{background:#fff;border-color:rgba(23,24,26,.34)}
-.devicepv :focus-visible{outline-color:var(--ink)}
+.devicepv__size{font-size:11px;letter-spacing:.08em;color:#FAEFE9}
+.devicepv__note{width:100%;max-width:74ch;font-size:12.5px;line-height:1.5;color:#FAEFE9;margin-bottom:16px}
+.devicepv .btn{background:rgba(255,255,255,.9);border-color:rgba(255,255,255,.5);color:#17181A}
+.devicepv .btn:hover{background:#fff;border-color:#fff}
+.devicepv :focus-visible{outline-color:#FFFFFF}
 .devicepv__fit{flex:none}
 .phone{position:relative;width:416px;padding:13px;border-radius:46px;background:#101114;border:1px solid rgba(23,24,26,.4);box-shadow:var(--shadow-3);transform-origin:top center}
 .phone__screen{width:390px;height:844px;border:0;border-radius:34px;background:var(--bg);display:block}
@@ -215,42 +291,17 @@
 .ex__out{margin-top:3px}
 
 /* == 12. dark mode ==
-   Two things in this app do not simply follow the palette swap.
+   The brand surfaces need nothing here. #C24A1C is a dark fill in either
+   theme, so the sidebar and the phone surround carry white text in both and
+   are set once, in §8b and §10, rather than corrected per theme. Under the
+   yellow this section was mostly the opposite correction: yellow stayed a
+   light surface in the dark, and every rule painting on it had to pin the
+   light ink values back by hand.
 
-   First the yellow sidebar. #EAC81C stays #EAC81C in the dark — a brand colour
-   that changes is not a brand colour — and yellow only ever carries ink text.
-   The dark palette flips --ink to near-white, so every rule that paints on the
-   yellow pins the light ink values back by hand. #17181A on #EAC81C is 10.8:1
-   and #2E3033 is 8:1; the near-white it replaces was 1.9:1.
-
-   Second the product cut-outs. Their drop shadow is ink at low alpha, which is
-   invisible on a dark surface, so the dark theme uses a deeper black — the
-   photographs still sit on the card rather than float over it. */
-[data-theme="dark"] .side[data-tone="amber"] .side__name,
-[data-theme="dark"] .side[data-tone="amber"] .navlink,
-[data-theme="dark"] .side[data-tone="amber"] .btn,
-[data-theme="dark"] .side[data-tone="amber"] .side__brandbtns .btn{color:#17181A}
-[data-theme="dark"] .side[data-tone="amber"] .side__tag,
-[data-theme="dark"] .side[data-tone="amber"] .navgroup__label,
-[data-theme="dark"] .side[data-tone="amber"] .navlink__count,
-[data-theme="dark"] .side[data-tone="amber"] .hint{color:#2E3033}
-/* the one dark button in the sidebar keeps white text — the rule above is
-   about text sitting on the yellow, and this one sits on #0F1012 */
-[data-theme="dark"] .side[data-tone="amber"] .sitelink,
-[data-theme="dark"] .side .sitelink{color:#fff}
-[data-theme="dark"] .side[data-tone="amber"] .mark{background:#17181A;color:var(--amber-fill)}
-[data-theme="dark"] .side[data-tone="amber"] .navlink svg{color:#6B5400}
-[data-theme="dark"] .side[data-tone="amber"] :focus-visible{outline-color:#17181A}
-/* the dark sidebar's active row is the page ground, so it keeps the light ink */
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{color:var(--ink)}
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active svg{color:var(--amber-deep)}
-/* the yellow phone surround is the same problem at page scale */
-[data-theme="dark"] .devicepv{color:#17181A}
-[data-theme="dark"] .devicepv__size,
-[data-theme="dark"] .devicepv__note{color:#2E3033}
-[data-theme="dark"] .devicepv .btn{color:#17181A}
-[data-theme="dark"] .devicepv :focus-visible{outline-color:#17181A}
-
+   What does not follow the palette swap is the product cut-outs. Their drop
+   shadow is ink at low alpha, which is invisible on a dark surface, so the
+   dark theme uses a deeper black — the photographs still sit on the card
+   rather than float over it. */
 [data-theme="dark"] .tile__img{filter:drop-shadow(0 3px 5px rgba(0,0,0,.62))}
 [data-theme="dark"] .tile--lg .tile__img{filter:drop-shadow(0 5px 9px rgba(0,0,0,.6))}
 [data-theme="dark"] .tile--sm .tile__img{filter:drop-shadow(0 1px 2px rgba(0,0,0,.66))}
