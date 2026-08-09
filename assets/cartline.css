@@ -290,3 +290,72 @@
   .devicepv{padding:14px 10px 22px}
 }
 @media (max-width:390px){ .prods{grid-template-columns:minmax(0,1fr)} }
+
+/* == 13. narrow-width corrections ==
+   Everything below is about the app being tapped on a phone rather than
+   clicked on a desk. No colour, type or spacing language changes here — only
+   the sizes and the overflow behaviour that a 320–430px viewport needs. */
+
+/* The sidebar becomes a fixed drawer below 900px and it covers the burger that
+   opened it, so on a touch screen there was no way back out of it — Escape is
+   the only close, and a phone has no Escape key. This is the ground to tap. */
+.sidescrim{display:none}
+@media (max-width:900px){
+  .sidescrim{position:fixed;inset:0;background:rgba(23,24,26,.42);z-index:64;border:0;padding:0;margin:0;cursor:pointer}
+  .side.is-open+.sidescrim{display:block}
+}
+
+/* The kit puts modals and drawers on a scrim at z-index 60, one step under the
+   sidebar drawer at 65. Above 900px the sidebar is a static column and the two
+   never meet; below it "Reset demo data" lives inside the drawer, so its
+   confirmation opened behind the panel that asked for it. Everything that
+   rides the scrim moves together, so the drawers keep their own order. */
+.scrim{z-index:66}
+
+/* A table in a horizontal scroller has somewhere to go, so its cells should
+   stay on one line. Without this the table shrinks to its minimum content
+   width instead of scrolling: "CL-1129" breaks after the hyphen, "12 / 200"
+   stacks over three lines and the ledger is unreadable at phone width. */
+@media (max-width:640px){
+  .tablewrap--scroll table.data th,
+  .tablewrap--scroll table.data td{white-space:nowrap}
+}
+
+/* Fourteen trading hours across a phone-width card leave about 22px a column,
+   which truncates every value above its bar to "₹4…". The chart scrolls
+   sideways instead; columns still grow to fill when the series is short. */
+@media (max-width:640px){
+  .bars{overflow-x:auto;overflow-y:hidden}
+  .bars__col{flex:1 0 46px}
+}
+
+/* Toasts are pinned bottom-right, which on a phone is exactly where the cart
+   drawer's Checkout button, the confirmation actions and the assistant
+   launcher all sit. Above the fold they collide with nothing. */
+@media (max-width:640px){
+  .toasts{top:calc(var(--bar) + 8px);bottom:auto;left:12px;right:12px;align-items:stretch}
+  .toast{max-width:none}
+}
+
+/* Tap targets. The kit sizes its controls for a pointer; these lift the ones
+   that fall short of about 44px on a touch screen without changing any of
+   their proportions above 900px. */
+@media (max-width:900px){
+  .topbar{gap:8px;padding:0 12px}
+  .btn{min-height:40px}
+  .btn--sm{min-height:32px}
+  .btn--icon{height:40px}
+  .tab{min-height:40px}
+  .chip{min-height:40px}
+  .navlink{padding-top:10px;padding-bottom:10px}
+  .faceswitch button{min-height:40px}
+  .qty button{width:38px;height:38px}
+  .qty output{line-height:38px}
+  /* the two icon controls on the sidebar brand row stay square and small —
+     they must never be wider than the rail they also live in */
+  .side__brandbtns .btn{width:36px;height:36px;min-height:0}
+  .notif__read{width:36px;height:36px;min-height:0}
+  /* an order number is the only way into the detail drawer, so give the run
+     of text a full row's worth of height to be hit */
+  .linkish{display:inline-block;padding:5px 0}
+}

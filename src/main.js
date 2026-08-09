@@ -119,6 +119,13 @@ app.appendChild(h('div', { class: 'shell' },
         })),
       h('p', { class: 'hint side__sub', id: 'sidehint', style: 'margin-top:10px' },
         'Sample data only. Nothing you enter leaves this browser.'))),
+  /* Below 900px the sidebar is a drawer laid over the page, and it covers the
+     burger that opened it. Without a ground to tap, a touch screen has no way
+     to dismiss it — Escape is a keyboard, and a phone has none. */
+  h('button', {
+    class: 'sidescrim', type: 'button', id: 'sidescrim', tabindex: '-1',
+    'aria-label': 'Close navigation',
+  }),
   h('div', { class: 'main' },
     h('header', { class: 'topbar' },
       h('button', {
@@ -149,10 +156,13 @@ const sideEl = qs('#side');
 const navEl = qs('#nav');
 const viewEl = qs('#view');
 
-qs('#menubtn').addEventListener('click', () => {
-  const open = sideEl.classList.toggle('is-open');
+function setSide(open) {
+  sideEl.classList.toggle('is-open', open);
   qs('#menubtn').setAttribute('aria-expanded', String(open));
-});
+}
+
+qs('#menubtn').addEventListener('click', () => setSide(!sideEl.classList.contains('is-open')));
+qs('#sidescrim').addEventListener('click', () => setSide(false));
 
 /* ---------- sidebar shape and colour ----------
    Kept in its own localStorage key so "Reset demo data" rebuilds the shop
@@ -283,7 +293,7 @@ function buildNav() {
         class: 'navlink', type: 'button', dataset: { route: id },
         title: `${r.label} — ${face.label}`,
         'aria-label': `${r.label}, ${face.label}`,
-        onclick: () => { ctx.nav(id); sideEl.classList.remove('is-open'); },
+        onclick: () => { ctx.nav(id); setSide(false); },
         html: `${icon(r.icon)}<span>${r.label}</span><span class="navlink__count mono" data-count="${id}"></span>`,
       }));
     });
@@ -418,7 +428,7 @@ ctx.bot = bot;
 const typing = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeCart(); closeOrder(); sideEl.classList.remove('is-open'); return; }
+  if (e.key === 'Escape') { closeCart(); closeOrder(); setSide(false); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (typing(e.target)) return;
   if (e.key === '/') {
