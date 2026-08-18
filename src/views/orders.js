@@ -4,6 +4,8 @@ import { h, icon, money, num, fmtDate, fmtTime, downloadCSV, toast } from '../..
 import { STATUSES, CHANNELS, dayKey, lastDays } from '../data.js';
 import { openOrder, advance, refundOrder, STEP_LABEL, nextStatus } from '../orderops.js';
 import { pillClass } from './track.js';
+import { t } from '../main.js';
+import { tr } from '../strings.js';
 
 const ALL_STATUS = [...STATUSES, 'refunded', 'cancelled'];
 
@@ -13,20 +15,20 @@ export default function renderOrders(ctx) {
 
   wrap.appendChild(h('div', { class: 'page-head' },
     h('div', { style: 'flex:1;min-width:0' },
-      h('h1', {}, 'Orders'),
-      h('p', {}, 'The full ledger, including refunds and cancellations. Click a row for the detail drawer, the timeline and the refund action.')),
+      h('h1', {}, t('route.orders.title')),
+      h('p', {}, t('orders.sub'))),
     h('div', { class: 'btnrow' },
       h('button', {
-        class: 'btn', type: 'button', html: `${icon('download')}<span>Export CSV</span>`,
+        class: 'btn', type: 'button', html: `${icon('download')}<span>${t('common.exportCsv')}</span>`,
         onclick: () => exportRows(ctx, filtered()),
       }))));
 
-  const search = h('input', { class: 'input', type: 'search', placeholder: 'Order number, customer or item', 'aria-label': 'Search orders' });
+  const search = h('input', { class: 'input', type: 'search', placeholder: t('orders.search'), 'aria-label': t('orders.searchAria') });
   search.addEventListener('input', () => { f.term = search.value.trim().toLowerCase(); paint(); });
 
-  const statusSel = sel('Status', ['all', ...ALL_STATUS], (v) => { f.status = v; paint(); }, (v) => (v === 'all' ? 'All statuses' : STEP_LABEL[v]));
-  const channelSel = sel('Channel', ['all', ...CHANNELS], (v) => { f.channel = v; paint(); }, (v) => (v === 'all' ? 'All channels' : v));
-  const daySel = sel('Day', ['all', ...lastDays(7)], (v) => { f.day = v; paint(); }, (v) => (v === 'all' ? 'Last 7 days' : v));
+  const statusSel = sel(t('orders.statusAria'), ['all', ...ALL_STATUS], (v) => { f.status = v; paint(); }, (v) => (v === 'all' ? t('orders.allStatuses') : t(`data.status.${v}`)));
+  const channelSel = sel(t('orders.channelAria'), ['all', ...CHANNELS], (v) => { f.channel = v; paint(); }, (v) => (v === 'all' ? t('orders.allChannels') : t(`data.channel.${v}`)));
+  const daySel = sel(t('orders.dayAria'), ['all', ...lastDays(7)], (v) => { f.day = v; paint(); }, (v) => (v === 'all' ? t('orders.last7') : v));
 
   wrap.appendChild(h('div', { class: 'filters' },
     h('div', { class: 'search' }, h('span', { html: icon('search') }), search),
@@ -54,33 +56,36 @@ export default function renderOrders(ctx) {
 
   function paint() {
     const rows = filtered();
-    count.textContent = `${num(rows.length)} orders · ${money(rows.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0), ctx.currency())} billed`;
+    count.textContent = t('orders.countLine', {
+      n: num(rows.length),
+      money: money(rows.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0), ctx.currency()),
+    });
     host.innerHTML = '';
     if (!rows.length) {
       host.appendChild(h('div', { class: 'empty' },
-        h('h3', {}, 'No orders match those filters'),
-        h('p', {}, 'Widen the day range or clear the search.')));
+        h('h3', {}, t('orders.emptyH')),
+        h('p', {}, t('orders.emptyP'))));
       return;
     }
     const table = h('table', { class: 'data' },
       h('thead', {}, h('tr', {},
-        h('th', {}, 'Order'), h('th', {}, 'Placed'), h('th', {}, 'Customer'),
-        h('th', {}, 'Channel'), h('th', {}, 'Items'), h('th', { class: 'right' }, 'Total'),
-        h('th', {}, 'Status'), h('th', { class: 'right' }, 'Action'))),
+        h('th', {}, t('common.order')), h('th', {}, t('common.placed')), h('th', {}, t('common.customer')),
+        h('th', {}, t('common.channel')), h('th', {}, t('common.items')), h('th', { class: 'right' }, t('common.total')),
+        h('th', {}, t('common.status')), h('th', { class: 'right' }, t('common.action')))),
       h('tbody', {}, rows.map((o) => {
         const next = nextStatus(o.status);
         return h('tr', {},
           h('td', {}, h('span', { class: 'linkish mono', role: 'button', tabindex: '0', onclick: () => openOrder(ctx, o.id, paint), onkeydown: (e) => { if (e.key === 'Enter') openOrder(ctx, o.id, paint); } }, o.no)),
           h('td', { class: 'mono small nowrap' }, `${fmtDate(o.placedAt, { day: '2-digit', month: 'short' })} ${fmtTime(o.placedAt)}`),
           h('td', {}, o.customer),
-          h('td', { class: 'small muted' }, o.channel + (o.area ? ` · ${o.area}` : '')),
-          h('td', { class: 'small muted' }, `${o.items.reduce((s, i) => s + i.qty, 0)} items${o.discountCode ? ` · ${o.discountCode}` : ''}`),
+          h('td', { class: 'small muted' }, t(`data.channel.${o.channel}`) + (o.area ? ` · ${tr('area', o.area)}` : '')),
+          h('td', { class: 'small muted' }, t('orders.itemsCell', { n: o.items.reduce((s, i) => s + i.qty, 0), code: o.discountCode })),
           h('td', { class: 'right mono' }, money(o.total, ctx.currency())),
-          h('td', {}, h('span', { class: `pill ${pillClass(o.status)}` }, STEP_LABEL[o.status])),
+          h('td', {}, h('span', { class: `pill ${pillClass(o.status)}` }, STEP_LABEL(o.status))),
           h('td', { class: 'right' }, h('div', { class: 'rowbtns' },
-            next ? h('button', { class: 'btn btn--sm', type: 'button', onclick: () => { advance(ctx, o); paint(); } }, STEP_LABEL[next]) : null,
+            next ? h('button', { class: 'btn btn--sm', type: 'button', onclick: () => { advance(ctx, o); paint(); } }, STEP_LABEL(next)) : null,
             o.status !== 'refunded' && o.status !== 'cancelled'
-              ? h('button', { class: 'btn btn--sm btn--danger', type: 'button', onclick: () => refundOrder(ctx, o, paint) }, 'Refund')
+              ? h('button', { class: 'btn btn--sm btn--danger', type: 'button', onclick: () => refundOrder(ctx, o, paint) }, t('common.refund'))
               : null)));
       })));
     host.appendChild(h('div', { class: 'tablewrap tablewrap--scroll' }, table));
@@ -98,13 +103,13 @@ function sel(label, values, onChange, fmt) {
 }
 
 function exportRows(ctx, rows) {
-  const head = ['Order', 'Placed', 'Customer', 'Channel', 'Items', 'Subtotal', 'Discount', 'Code', 'Tax', 'Total', 'Status', 'Refund'];
+  const head = t('orders.csvHead');
   const body = rows.map((o) => [
-    o.no, o.placedAt, o.customer, o.channel,
+    o.no, o.placedAt, o.customer, t(`data.channel.${o.channel}`),
     o.items.map((i) => `${i.qty}x ${i.name}`).join(' | '),
     o.subtotal, o.discountAmt, o.discountCode, o.tax, o.total,
-    o.status, o.refund ? o.refund.reason : '',
+    t(`data.statusRaw.${o.status}`), o.refund ? tr('refundReason', o.refund.reason) : '',
   ]);
   downloadCSV(`cartline-orders-${dayKey(new Date())}.csv`, [head, ...body]);
-  toast(`${rows.length} orders exported`, 'ok');
+  toast(t('orders.exported', { n: rows.length }), 'ok');
 }

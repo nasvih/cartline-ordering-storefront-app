@@ -16,8 +16,10 @@ import {
   ordersOn, lowStock, orderByNo, STATUSES,
 } from './data.js';
 import { actionIntents, ACTION_EXAMPLES, READ_EXAMPLES } from './actions.js';
+import { t, tlist } from './main.js';
+import { tr } from './strings.js';
 
-const STEP_LABEL = { new: 'new', preparing: 'preparing', ready: 'ready', completed: 'completed', refunded: 'refunded', cancelled: 'cancelled' };
+const STEP_LABEL = (status) => t(`data.statusRaw.${status}`);
 
 export function buildAgent(ctx) {
   const cur = () => ctx.state.settings.currency;
@@ -28,42 +30,50 @@ export function buildAgent(ctx) {
     {
       id: 'revenue-today',
       match: [/revenue|takings|sales|turnover|how much.*(made|sold)|money/i, 'revenue today'],
-      trace: 'summed every order line placed today',
+      trace: t('reads.revenueTrace'),
       answer: () => {
         const s = daySummary(ctx.state, today());
         const y = daySummary(ctx.state, lastDays(2)[1]);
         const diff = y.gross ? Math.round(((s.gross - y.gross) / y.gross) * 100) : 0;
         return {
-          text: `Today is at **${M(s.gross)}** gross across ${num(s.orders)} orders, **${M(s.net)}** net once ${M(s.refunds)} of refunds come off.\n\nYesterday finished at ${M(y.gross)}, so today is ${diff >= 0 ? 'up' : 'down'} ${Math.abs(diff)}% so far.`,
+          text: t('reads.revenueText', {
+            gross: M(s.gross),
+            orders: num(s.orders),
+            net: M(s.net),
+            refunds: M(s.refunds),
+            yGross: M(y.gross),
+            dir: diff >= 0 ? t('reads.up') : t('reads.down'),
+            diff: Math.abs(diff),
+          }),
           table: {
-            head: ['Measure', 'Today', 'Yesterday'],
+            head: [t('reads.measure'), t('common.today'), t('common.yesterday')],
             rows: [
-              ['Orders', num(s.orders), num(y.orders)],
-              ['Gross', M(s.gross), M(y.gross)],
-              ['Refunds', M(s.refunds), M(y.refunds)],
-              ['Net', M(s.net), M(y.net)],
-              ['Average order', M(s.aov), M(y.aov)],
+              [t('reads.ordersRow'), num(s.orders), num(y.orders)],
+              [t('reads.grossRow'), M(s.gross), M(y.gross)],
+              [t('reads.refundsRow'), M(s.refunds), M(y.refunds)],
+              [t('reads.netRow'), M(s.net), M(y.net)],
+              [t('reads.avgOrderRow'), M(s.aov), M(y.aov)],
             ],
           },
-          suggestions: ['What sold best today?', 'What is low on stock?', 'How does this week look?'],
+          suggestions: [t('ask.bestSellers'), t('ask.lowStock'), t('ask.week')],
         };
       },
     },
     {
       id: 'best-sellers',
       match: [/sold best|best sell|bestsell|top item|top sell|most sold|popular|what.*sold/i, 'best sellers'],
-      trace: 'grouped today\'s order lines by product',
+      trace: t('reads.bestTrace'),
       answer: () => {
         const items = topItems(ctx.state, today(), 5);
-        if (!items.length) return { text: 'Nothing has sold yet today. Place an order on the storefront and ask again.' };
+        if (!items.length) return { text: t('reads.bestNone') };
         const lead = items[0];
         return {
-          text: `**${lead.name}** leads today with ${num(lead.qty)} sold, worth ${M(lead.revenue)}. Here is the rest of the top five.`,
+          text: t('reads.bestText', { name: lead.name, qty: num(lead.qty), money: M(lead.revenue) }),
           table: {
-            head: ['Item', 'Sold', 'Revenue'],
+            head: [t('common.item'), t('common.sold'), t('common.revenue')],
             rows: items.map((it) => [it.name, num(it.qty), M(it.revenue)]),
           },
-          suggestions: ['Which category earns most?', 'What is low on stock?', 'What is the average order value?'],
+          suggestions: [t('ask.category'), t('ask.lowStock'), t('ask.aov')],
         };
       },
     },
@@ -72,119 +82,155 @@ export function buildAgent(ctx) {
       /* "restock X" is an instruction handled in src/actions.js, so this
          reader only claims the question shapes. */
       match: [/\blow\b.{0,4}stock|running out|reorder|out of stock|stock level|need.*reorder/i, 'low stock'],
-      trace: 'checked every listed product against the low-stock threshold',
+      trace: t('reads.lowTrace'),
       answer: () => {
         const low = lowStock(ctx.state);
         const limit = ctx.state.settings.lowStockAt;
-        if (!low.length) return { text: `Nothing is at or below ${num(limit)} units. The catalogue is comfortable.` };
+        if (!low.length) return { text: t('reads.lowNone', { limit: num(limit) }) };
         const zero = low.filter((p) => p.stock === 0);
-        const cost = low.reduce((t, p) => t + (20 - p.stock) * p.cost, 0);
+        const cost = low.reduce((t2, p) => t2 + (20 - p.stock) * p.cost, 0);
         return {
-          text: `${num(low.length)} products are at or below ${num(limit)} units${zero.length ? `, and ${num(zero.length)} are already at zero` : ''}. Topping each of them back to 20 units costs about **${M(cost)}** at cost price.`,
+          text: t('reads.lowText', {
+            n: num(low.length),
+            limit: num(limit),
+            zero: zero.length ? num(zero.length) : 0,
+            cost: M(cost),
+          }),
           table: {
-            head: ['Product', 'Stock', 'Sold today'],
+            head: [t('common.product'), t('common.stock'), t('reads.soldToday')],
             rows: low.slice(0, 8).map((p) => [p.name, String(p.stock), num(soldToday(ctx, p.id))]),
           },
-          suggestions: ['What sold best today?', 'How much stock do we hold?', 'Show the open orders'],
+          suggestions: [t('ask.bestSellers'), t('ask.stockValue'), t('ask.openOrders')],
         };
       },
     },
     {
       id: 'order-status',
       match: [/\bCL[- ]?\d+/i, /order\s+#?\d{3,}/i, /where is (my )?order|order status|track|order number|order by number|look ?up an order|find an order/i],
-      trace: 'looked the order up by number',
+      trace: t('reads.orderTrace'),
       answer: (q) => {
         const m = q.match(/\d{3,}/);
         if (!m) {
           const last = ctx.state.orders[0];
-          return { text: `Give me a number and I will pull it up — the newest order on the board is **${last.no}** for ${last.customer}, currently ${STEP_LABEL[last.status]}.` };
+          return {
+            text: t('reads.orderNoNumber', {
+              no: last.no, customer: last.customer, stage: STEP_LABEL(last.status),
+            }),
+          };
         }
         const o = orderByNo(ctx.state, m[0]);
-        if (!o) return { text: `I have no order numbered ${m[0]}. Numbers in this demo run from CL-1042 upwards.` };
+        if (!o) return { text: t('reads.orderMissing', { n: m[0] }) };
         const line = o.status === 'refunded'
-          ? `It was refunded ${M(o.refund.amount)} — ${o.refund.reason.toLowerCase()}.`
+          ? t('reads.orderRefunded', {
+            money: M(o.refund.amount),
+            reason: tr('refundReason', o.refund.reason).toLowerCase(),
+          })
           : o.status === 'cancelled'
-            ? 'It was cancelled before the kitchen started it.'
-            : `It sits at **${STEP_LABEL[o.status]}** and was last touched ${ago(o.updatedAt)}.`;
+            ? t('reads.orderCancelled')
+            : t('reads.orderAt', { stage: STEP_LABEL(o.status), ago: ago(o.updatedAt) });
         return {
-          text: `**${o.no}** for ${o.customer}, ${o.channel.toLowerCase()}, ${M(o.total)} paid by ${o.payment}. ${line}`,
+          text: t('reads.orderHead', {
+            no: o.no,
+            customer: o.customer,
+            channel: t(`data.channel.${o.channel}`).toLowerCase(),
+            money: M(o.total),
+            payment: t(`data.payment.${o.payment}`),
+            line,
+          }),
           table: {
-            head: ['Item', 'Qty', 'Line'],
+            head: [t('common.item'), t('common.qty'), t('common.line')],
             rows: o.items.map((it) => [it.name, String(it.qty), M(it.price * it.qty)]),
           },
-          meta: `read order ${o.no} and its ${o.timeline.length} timeline entries`,
-          suggestions: ['Why do orders get refunded?', 'Show the open orders', 'What is today\'s revenue?'],
+          meta: t('reads.orderMeta', { no: o.no, n: o.timeline.length }),
+          suggestions: [t('ask.whyRefunds'), t('ask.openOrders'), t('ask.revenue')],
         };
       },
     },
     {
       id: 'refunds',
       match: [/refund|money back|charge ?back|returned/i, 'refunds'],
-      trace: 'read every refund record from the last seven days',
+      trace: t('reads.refundsTrace'),
       answer: () => {
         const days = lastDays(7);
         const refs = ctx.state.orders.filter((o) => o.status === 'refunded' && days.includes(dayKey(o.placedAt)));
-        if (!refs.length) return { text: 'No refunds in the last seven days.' };
-        const total = refs.reduce((t, o) => t + (o.refund ? o.refund.amount : o.total), 0);
+        if (!refs.length) return { text: t('reads.refundsNone') };
+        const total = refs.reduce((t2, o) => t2 + (o.refund ? o.refund.amount : o.total), 0);
         const byReason = new Map();
         refs.forEach((o) => {
-          const r = o.refund ? o.refund.reason : 'Not recorded';
+          const r = o.refund ? tr('refundReason', o.refund.reason) : t('reads.notRecorded');
           byReason.set(r, (byReason.get(r) || 0) + 1);
         });
         const ranked = [...byReason.entries()].sort((a, b) => b[1] - a[1]);
         return {
-          text: `${num(refs.length)} refunds in seven days, **${M(total)}** in total. The most common reason is "${ranked[0][0].toLowerCase()}".`,
+          text: t('reads.refundsText', {
+            n: num(refs.length), money: M(total), reason: ranked[0][0].toLowerCase(),
+          }),
           table: {
-            head: ['Reason', 'Orders'],
+            head: [t('reads.reasonRow'), t('reads.ordersRow')],
             rows: ranked.map(([r, n]) => [r, num(n)]),
           },
-          suggestions: ['What is today\'s revenue?', 'Show the open orders', 'Which category earns most?'],
+          suggestions: [t('ask.revenue'), t('ask.openOrders'), t('ask.category')],
         };
       },
     },
     {
       id: 'aov',
       match: [/average order|basket size|average basket|\baov\b|average spend/i, 'average order value'],
-      trace: 'divided billable revenue by billable orders',
+      trace: t('reads.aovTrace'),
       answer: () => {
         const s = daySummary(ctx.state, today());
         const week = lastDays(7).map((k) => daySummary(ctx.state, k));
-        const wOrders = week.reduce((t, d) => t + d.billable, 0);
-        const wGross = week.reduce((t, d) => t + d.gross, 0);
+        const wOrders = week.reduce((t2, d) => t2 + d.billable, 0);
+        const wGross = week.reduce((t2, d) => t2 + d.gross, 0);
         const wAov = wOrders ? Math.round(wGross / wOrders) : 0;
         return {
-          text: `Average order value today is **${M(s.aov)}** over ${num(s.billable)} billable orders. Across the last seven days it is ${M(wAov)}, so today runs ${s.aov >= wAov ? 'above' : 'below'} the recent line.\n\nDiscount codes took ${M(s.discount)} off today's baskets.`,
-          suggestions: ['What sold best today?', 'Which discount code costs most?', 'When is the rush?'],
+          text: t('reads.aovText', {
+            today: M(s.aov),
+            billable: num(s.billable),
+            week: M(wAov),
+            dir: s.aov >= wAov ? t('reads.above') : t('reads.below'),
+            discount: M(s.discount),
+          }),
+          suggestions: [t('ask.bestSellers'), t('ask.costliestCode'), t('ask.rush')],
         };
       },
     },
     {
       id: 'queue',
       match: [/open orders|queue|board|waiting|preparing|how busy|backlog|pending/i, 'open orders'],
-      trace: 'scanned the live board columns',
+      trace: t('reads.queueTrace'),
       answer: () => {
         const live = ctx.state.orders.filter((o) => STATUSES.includes(o.status) && o.status !== 'completed');
-        if (!live.length) return { text: 'The board is clear — nothing is waiting on the kitchen right now.' };
-        const value = live.reduce((t, o) => t + o.total, 0);
+        if (!live.length) return { text: t('reads.queueNone') };
+        const value = live.reduce((t2, o) => t2 + o.total, 0);
         const oldest = live.slice().sort((a, b) => new Date(a.placedAt) - new Date(b.placedAt))[0];
         const late = live.filter((o) => (Date.now() - new Date(o.placedAt).getTime()) / 60000 > ctx.state.settings.prepMinutes);
         return {
-          text: `${num(live.length)} orders are open, worth **${M(value)}**. The oldest is ${oldest.no} for ${oldest.customer}, placed ${ago(oldest.placedAt)}.${late.length ? ` ${num(late.length)} are past the ${num(ctx.state.settings.prepMinutes)} minute promise.` : ''}`,
+          text: t('reads.queueText', {
+            n: num(live.length),
+            value: M(value),
+            no: oldest.no,
+            customer: oldest.customer,
+            ago: ago(oldest.placedAt),
+            late: late.length
+              ? t('reads.queueLate', { n: num(late.length), prep: num(ctx.state.settings.prepMinutes) })
+              : '',
+          }),
           table: {
-            head: ['Column', 'Orders', 'Value'],
+            head: [t('reads.columnRow'), t('reads.ordersRow'), t('reads.valueRow')],
             rows: STATUSES.map((s) => {
               const inCol = ctx.state.orders.filter((o) => o.status === s && dayKey(o.placedAt) === today());
-              return [s, num(inCol.length), M(inCol.reduce((t, o) => t + o.total, 0))];
+              return [STEP_LABEL(s), num(inCol.length), M(inCol.reduce((t2, o) => t2 + o.total, 0))];
             }),
           },
-          suggestions: ['Where is order CL-1052?', 'What is today\'s revenue?', 'What is low on stock?'],
+          suggestions: [t('ask.whereOrderFixed'), t('ask.revenue'), t('ask.lowStock')],
         };
       },
     },
     {
       id: 'discounts',
       match: [/discount|coupon|promo|code|offer/i, 'discount codes'],
-      trace: 'joined the code list against seven days of orders',
+      trace: t('reads.codesTrace'),
       answer: () => {
         const days = lastDays(7);
         const rows = ctx.state.discounts.map((d) => {
@@ -192,102 +238,126 @@ export function buildAgent(ctx) {
           return {
             code: d.code,
             active: d.active,
-            given: used.reduce((t, o) => t + o.discountAmt, 0),
+            given: used.reduce((t2, o) => t2 + o.discountAmt, 0),
             orders: used.length,
-            revenue: used.reduce((t, o) => t + o.total, 0),
+            revenue: used.reduce((t2, o) => t2 + o.total, 0),
           };
         }).sort((a, b) => b.given - a.given);
-        const given = rows.reduce((t, r) => t + r.given, 0);
+        const given = rows.reduce((t2, r) => t2 + r.given, 0);
         const top = rows[0];
         return {
-          text: `${num(ctx.state.discounts.filter((d) => d.active).length)} codes are active and they gave away **${M(given)}** in seven days.${top && top.given ? ` ${top.code} is the costliest at ${M(top.given)} across ${num(top.orders)} orders.` : ''}`,
+          text: t('reads.codesText', {
+            n: num(ctx.state.discounts.filter((d) => d.active).length),
+            given: M(given),
+            top: top && top.given
+              ? t('reads.codesTop', { code: top.code, money: M(top.given), orders: num(top.orders) })
+              : '',
+          }),
           table: {
-            head: ['Code', 'State', 'Orders', 'Given'],
-            rows: rows.map((r) => [r.code, r.active ? 'active' : 'paused', num(r.orders), M(r.given)]),
+            head: [t('common.code'), t('common.state'), t('reads.ordersRow'), t('reads.givenRow')],
+            rows: rows.map((r) => [r.code, r.active ? t('reads.stateActive') : t('reads.statePaused'), num(r.orders), M(r.given)]),
           },
-          suggestions: ['What is the average order value?', 'What is today\'s revenue?', 'How does this week look?'],
+          suggestions: [t('ask.aov'), t('ask.revenue'), t('ask.week')],
         };
       },
     },
     {
       id: 'category',
       match: [/categor|section|which part of the menu|bakes|meals|drinks|snacks|grocery|sweets/i, 'by category'],
-      trace: 'grouped today\'s lines by category',
+      trace: t('reads.catTrace'),
       answer: () => {
         const cats = revenueByCategory(ctx.state, today()).sort((a, b) => b.value - a.value);
-        const total = cats.reduce((t, c) => t + c.value, 0);
-        if (!total) return { text: 'No category has taken anything yet today.' };
+        const total = cats.reduce((t2, c) => t2 + c.value, 0);
+        if (!total) return { text: t('reads.catNone') };
         return {
-          text: `**${cats[0].label}** is ahead today with ${M(cats[0].value)}, ${pct((cats[0].value / total) * 100, 0)} of the counter.`,
+          text: t('reads.catText', {
+            name: cats[0].label, money: M(cats[0].value), share: pct((cats[0].value / total) * 100, 0),
+          }),
           table: {
-            head: ['Category', 'Revenue', 'Share'],
+            head: [t('common.category'), t('common.revenue'), t('reads.shareRow')],
             rows: cats.map((c) => [c.label, M(c.value), pct(total ? (c.value / total) * 100 : 0, 0)]),
           },
-          suggestions: ['What sold best today?', 'What is low on stock?', 'When is the rush?'],
+          suggestions: [t('ask.bestSellers'), t('ask.lowStock'), t('ask.rush')],
         };
       },
     },
     {
       id: 'busiest',
       match: [/busiest|peak|rush|what time|which hour|quiet/i, 'busiest hour'],
-      trace: 'bucketed today\'s orders into trading hours',
+      trace: t('reads.hourTrace'),
       answer: () => {
         const hours = revenueByHour(ctx.state, today()).filter((b) => b.orders > 0);
-        if (!hours.length) return { text: 'No orders yet today, so there is no rush to point at.' };
+        if (!hours.length) return { text: t('reads.hourNone') };
         const ranked = hours.slice().sort((a, b) => b.value - a.value);
         const peak = ranked[0];
         return {
-          text: `The rush today is **${peak.label}:00 to ${String(Number(peak.label) + 1).padStart(2, '0')}:00** — ${num(peak.orders)} orders worth ${M(peak.value)}. Quietest trading hour so far is ${ranked[ranked.length - 1].label}:00.`,
+          text: t('reads.hourText', {
+            from: peak.label,
+            to: String(Number(peak.label) + 1).padStart(2, '0'),
+            orders: num(peak.orders),
+            money: M(peak.value),
+            quiet: ranked[ranked.length - 1].label,
+          }),
           table: {
-            head: ['Hour', 'Orders', 'Revenue'],
+            head: [t('reads.hourRow'), t('reads.ordersRow'), t('common.revenue')],
             rows: ranked.slice(0, 5).map((b) => [`${b.label}:00`, num(b.orders), M(b.value)]),
           },
-          suggestions: ['Show the open orders', 'What is today\'s revenue?', 'What sold best today?'],
+          suggestions: [t('ask.openOrders'), t('ask.revenue'), t('ask.bestSellers')],
         };
       },
     },
     {
       id: 'week',
       match: [/this week|last 7|seven days|trend|compare|yesterday|week/i, 'this week'],
-      trace: 'read seven day summaries end to end',
+      trace: t('reads.weekTrace'),
       answer: () => {
         const days = lastDays(7).slice().reverse();
         const rows = days.map((k) => ({ k, s: daySummary(ctx.state, k) }));
-        const gross = rows.reduce((t, r) => t + r.s.gross, 0);
+        const gross = rows.reduce((t2, r) => t2 + r.s.gross, 0);
         const best = rows.slice().sort((a, b) => b.s.gross - a.s.gross)[0];
         return {
-          text: `Seven days come to **${M(gross)}** gross across ${num(rows.reduce((t, r) => t + r.s.orders, 0))} orders. The strongest day is ${dayLabel(best.k).toLowerCase()} at ${M(best.s.gross)}.`,
+          text: t('reads.weekText', {
+            gross: M(gross),
+            orders: num(rows.reduce((t2, r) => t2 + r.s.orders, 0)),
+            day: dayLabel(best.k).toLowerCase(),
+            best: M(best.s.gross),
+          }),
           table: {
-            head: ['Day', 'Orders', 'Gross', 'Net'],
+            head: [t('reads.dayRow'), t('reads.ordersRow'), t('reads.grossRow'), t('reads.netRow')],
             rows: rows.map((r) => [dayLabel(r.k), num(r.s.orders), M(r.s.gross), M(r.s.net)]),
           },
-          suggestions: ['What is the average order value?', 'Why do orders get refunded?', 'Which category earns most?'],
+          suggestions: [t('ask.aov'), t('ask.whyRefunds'), t('ask.category')],
         };
       },
     },
     {
       id: 'stock-value',
       match: [/stock value|inventory|how much stock|worth of stock|holding/i, 'stock', 'stock value'],
-      trace: 'valued every product line at cost and at retail',
+      trace: t('reads.stockTrace'),
       answer: () => {
         const ps = ctx.state.products;
-        const cost = ps.reduce((t, p) => t + p.stock * p.cost, 0);
-        const retail = ps.reduce((t, p) => t + p.stock * p.price, 0);
+        const cost = ps.reduce((t2, p) => t2 + p.stock * p.cost, 0);
+        const retail = ps.reduce((t2, p) => t2 + p.stock * p.price, 0);
         const deepest = ps.slice().sort((a, b) => b.stock * b.cost - a.stock * a.cost).slice(0, 5);
         return {
-          text: `The catalogue holds **${M(cost)}** at cost, ${M(retail)} at shelf price across ${num(ps.length)} products. That is a paper margin of ${pct(retail ? ((retail - cost) / retail) * 100 : 0, 1)}.`,
+          text: t('reads.stockText', {
+            cost: M(cost),
+            retail: M(retail),
+            n: num(ps.length),
+            margin: pct(retail ? ((retail - cost) / retail) * 100 : 0, 1),
+          }),
           table: {
-            head: ['Product', 'Stock', 'At cost'],
+            head: [t('common.product'), t('common.stock'), t('reads.atCostRow')],
             rows: deepest.map((p) => [p.name, String(p.stock), M(p.stock * p.cost)]),
           },
-          suggestions: ['What is low on stock?', 'Which category earns most?', 'What sold best today?'],
+          suggestions: [t('ask.lowStock'), t('ask.category'), t('ask.bestSellers')],
         };
       },
     },
     {
       id: 'customers',
       match: [/customer|who ordered|who bought|who spends|spends the most|top spender|biggest spender|repeat|regular/i, 'customers'],
-      trace: 'grouped seven days of orders by name on the ticket',
+      trace: t('reads.custTrace'),
       answer: () => {
         const days = lastDays(7);
         const map = new Map();
@@ -298,57 +368,73 @@ export function buildAgent(ctx) {
           map.set(o.customer, cur2);
         });
         const ranked = [...map.entries()].sort((a, b) => b[1].spend - a[1].spend).slice(0, 6);
-        if (!ranked.length) return { text: 'No customer records in the last seven days.' };
+        if (!ranked.length) return { text: t('reads.custNone') };
         const repeat = [...map.values()].filter((v) => v.orders > 1).length;
         return {
-          text: `${num(map.size)} names bought something in seven days and ${num(repeat)} of them came back more than once. **${ranked[0][0]}** spent the most at ${M(ranked[0][1].spend)}.`,
+          text: t('reads.custText', {
+            names: num(map.size), repeat: num(repeat), top: ranked[0][0], spend: M(ranked[0][1].spend),
+          }),
           table: {
-            head: ['Customer', 'Orders', 'Spend'],
+            head: [t('common.customer'), t('reads.ordersRow'), t('reads.spendRow')],
             rows: ranked.map(([n, v]) => [n, num(v.orders), M(v.spend)]),
           },
-          suggestions: ['What is the average order value?', 'Show the open orders', 'How does this week look?'],
+          suggestions: [t('ask.aov'), t('ask.openOrders'), t('ask.week')],
         };
       },
     },
     {
       id: 'today-shape',
       match: [/how is today|day so far|summary|how are we doing|overview/i, 'today'],
-      trace: 'pulled the day summary the operations screen uses',
+      trace: t('reads.todayTrace'),
       answer: () => {
         const s = daySummary(ctx.state, today());
         const items = topItems(ctx.state, today(), 1);
         const live = ctx.state.orders.filter((o) => STATUSES.includes(o.status) && o.status !== 'completed').length;
         return {
-          text: `${num(s.orders)} orders so far, ${M(s.gross)} gross and ${M(s.net)} net. Average basket ${M(s.aov)}, ${num(s.items)} items out of the door.${items.length ? ` ${items[0].name} is the item of the day.` : ''}\n\n${live ? `${num(live)} orders are still open on the board.` : 'The board is clear.'}`,
-          suggestions: ['What is low on stock?', 'When is the rush?', 'Show the open orders'],
+          text: t('reads.todayText', {
+            orders: num(s.orders),
+            gross: M(s.gross),
+            net: M(s.net),
+            aov: M(s.aov),
+            items: num(s.items),
+            star: items.length ? t('reads.todayStar', { name: items[0].name }) : '',
+            live: live ? t('reads.todayLive', { n: num(live) }) : t('reads.todayClear'),
+          }),
+          suggestions: [t('ask.lowStock'), t('ask.rush'), t('ask.openOrders')],
         };
       },
     },
     {
       id: 'help',
       match: [/what can you|what do you do|help|how do you work|capabilit|what are you able/i, 'what can you do'],
-      trace: 'listed the intents and the actions this build ships with',
+      trace: t('reads.helpTrace'),
       answer: () => {
         const s = daySummary(ctx.state, today());
         return {
-          text: `Two things. I **read** this store — the same records the screens draw from, ${num(s.orders)} orders and ${M(s.gross)} gross today — and I **change** it when you ask me to. Nothing is written until you press the button on my reply, and every change names the exact record and shows it before and after.\n\nSix things I can do to the shop:`,
+          text: t('reads.helpText', { orders: num(s.orders), gross: M(s.gross) }),
           table: {
-            head: ['Ask me this', 'What happens'],
-            rows: ACTION_EXAMPLES.map((e) => [`**${e.ask}**`, e.reply]),
+            head: [t('reads.helpAskRow'), t('reads.helpDoesRow')],
+            rows: ACTION_EXAMPLES().map((e) => [`**${e.ask}**`, e.reply]),
           },
-          meta: `${num(ACTION_EXAMPLES.length)} actions and ${num(reads.length)} readers over ${num(ctx.state.orders.length)} orders, ${num(ctx.state.products.length)} products and ${num(ctx.state.discounts.length)} codes`,
-          suggestions: ['Restock Karak Chai by 24', 'Move CL-1052 to ready', 'What questions can you answer?', "What is today's revenue?"],
+          meta: t('reads.helpMeta', {
+            actions: num(ACTION_EXAMPLES().length),
+            readers: num(reads.length),
+            orders: num(ctx.state.orders.length),
+            products: num(ctx.state.products.length),
+            codes: num(ctx.state.discounts.length),
+          }),
+          suggestions: [t('ask.restock'), t('ask.move'), t('ask.whatQuestions'), t('ask.revenue')],
         };
       },
     },
     {
       id: 'help-read',
       match: [/what (?:questions|else) can|what do you know|what can you tell/i],
-      trace: 'listed the reading intents this build ships with',
+      trace: t('reads.helpReadTrace'),
       answer: () => ({
-        text: 'I read the same store data the screens do. Things I answer well:\n\n- Today\'s revenue, net after refunds, and the comparison with yesterday\n- Best sellers and revenue by category\n- What is low on stock and what a top-up would cost\n- The status of any order by number, for example CL-1052\n- Refund counts and the reasons behind them\n- Average order value, the busiest hour, the week so far\n- Discount code usage and what each code gave away\n- Stock value at cost and at shelf price\n\nAsk "what can you do?" for the six things I can change rather than report.',
-        table: { head: ['Ask me this', 'What comes back'], rows: READ_EXAMPLES.map((e) => [`**${e.ask}**`, e.reply]) },
-        suggestions: ['What is today\'s revenue?', 'What sold best today?', 'What is low on stock?', 'What can you do?'],
+        text: t('reads.helpReadText'),
+        table: { head: [t('reads.helpAskRow'), t('reads.helpReadRow')], rows: READ_EXAMPLES().map((e) => [`**${e.ask}**`, e.reply]) },
+        suggestions: [t('ask.revenue'), t('ask.bestSellers'), t('ask.lowStock'), t('ask.whatCanYouDo')],
       }),
     },
   ];
@@ -356,20 +442,40 @@ export function buildAgent(ctx) {
   /* Instructions first, questions second. */
   const intents = [...actionIntents(ctx), ...reads];
 
+  /* The phrases a Gulf reader would actually type live in the Arabic half of
+     the dictionary, keyed by intent id. They are appended to what each intent
+     already matches on, never substituted — `match.<id>` is an empty list in
+     the English half, so English routing is byte-for-byte what it was. */
+  intents.forEach((it) => {
+    const extra = tlist(`match.${it.id}`);
+    if (extra.length) it.match = [].concat(it.match || [], extra.map((s) => new RegExp(s, 'i')));
+  });
+
   const bot = new Assistant({
-    name: 'Cartline Assist',
-    initials: 'CA',
-    tag: 'Store agent · demo',
-    greeting: `I read this store's live data and I can change it. Ask about today's takings or an order by number — or tell me to restock something, move an order on, or set up a discount code. Ask "what can you do?" for the list.`,
-    suggestions: ['What can you do?', 'What is today\'s revenue?', 'Restock Karak Chai by 24', 'Show the open orders'],
+    name: t('agent.name'),
+    initials: t('agent.initials'),
+    tag: t('agent.tag'),
+    greeting: t('agent.greeting'),
+    suggestions: tlist('agent.suggestions'),
     intents,
-    fallbacks: [
-      'I could not match that to anything in the store data. Try "what is today\'s revenue" and I will pull the day summary.',
-      'That one is outside what this build answers. Try "what is low on stock" or "where is order CL-1052".',
-      'No intent for that yet. I do answer "what sold best today", and I can act — "restock Karak Chai by 24" or "move CL-1052 to ready".',
-      'I only work from this store\'s own records. Try "which discount code costs most", or ask "what can you do?" for the changes I can make.',
-    ],
-    note: 'Simulated agent — answers and actions are matched against this app\'s own demo data in your browser. No request leaves this device.',
+    fallbacks: tlist('agent.fallbacks'),
+    note: t('agent.note'),
+    /* The panel's own chrome, in the language the page is reading. */
+    labels: {
+      openAria: (name) => t('agent.chrome.openAria', { name }),
+      fabTitle: (name) => t('agent.chrome.fabTitle', { name }),
+      reset: t('agent.chrome.reset'),
+      close: t('agent.chrome.close'),
+      ask: t('agent.chrome.ask'),
+      send: t('agent.chrome.send'),
+      you: t('agent.chrome.you'),
+      working: t('agent.chrome.working'),
+      edge: t('agent.chrome.edge'),
+      failed: t('agent.chrome.failed'),
+      done: t('agent.chrome.done'),
+      appliedMeta: t('agent.chrome.appliedMeta'),
+      searchTrace: t('agent.chrome.searchTrace'),
+    },
     context: () => ({
       day: today(),
       summary: daySummary(ctx.state, today()),
@@ -384,5 +490,5 @@ export function buildAgent(ctx) {
 function soldToday(ctx, productId) {
   return ordersOn(ctx.state, dayKey(new Date()))
     .filter((o) => o.status !== 'cancelled')
-    .reduce((t, o) => t + o.items.filter((it) => it.productId === productId).reduce((n, it) => n + it.qty, 0), 0);
+    .reduce((t2, o) => t2 + o.items.filter((it) => it.productId === productId).reduce((n, it) => n + it.qty, 0), 0);
 }

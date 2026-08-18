@@ -5,6 +5,7 @@
 
 import { h, icon, money, toast } from '../lib/ui.js';
 import { priceCart, productById, discountByCode, productImage } from './data.js';
+import { t } from './main.js';
 
 export function cartLines(state) {
   return state.cart.items.map((it) => {
@@ -67,7 +68,7 @@ export function toggleCart(ctx) {
 export function showCart(ctx) {
   closeCart();
   const scrim = h('div', { class: 'scrim', style: 'place-items:stretch;padding:0' });
-  const drawer = h('aside', { class: 'drawer', role: 'dialog', 'aria-label': 'Cart' });
+  const drawer = h('aside', { class: 'drawer', role: 'dialog', 'aria-label': t('cart.aria') });
   scrim.appendChild(drawer);
   scrim.addEventListener('click', (e) => { if (e.target === scrim) closeCart(); });
   document.body.appendChild(scrim);
@@ -77,37 +78,37 @@ export function showCart(ctx) {
     const { lines, subtotal, discountAmt, tax, total, code } = cartTotals(ctx.state);
     drawer.innerHTML = '';
     drawer.appendChild(h('header', { class: 'drawer__head' },
-      h('h3', { style: 'flex:1' }, 'Your cart'),
-      h('span', { class: 'pill' }, `${lines.reduce((s, l) => s + l.qty, 0)} items`),
+      h('h3', { style: 'flex:1' }, t('cart.title')),
+      h('span', { class: 'pill' }, t('cart.count', { n: lines.reduce((s, l) => s + l.qty, 0) })),
       h('button', {
-        class: 'btn btn--ghost btn--icon', 'aria-label': 'Close cart',
+        class: 'btn btn--ghost btn--icon', 'aria-label': t('cart.close'),
         onclick: closeCart, html: icon('x'),
       })));
 
     const body = h('div', { class: 'drawer__body' });
     if (!lines.length) {
       body.appendChild(h('div', { class: 'empty' },
-        h('h3', {}, 'Nothing in the cart yet'),
-        h('p', {}, 'Add something from the shop and it will show up here.')));
+        h('h3', {}, t('cart.emptyH')),
+        h('p', {}, t('cart.emptyP'))));
     } else {
       lines.forEach((l) => {
         body.appendChild(h('div', { class: 'cartline' },
           tile(l, 'tile--sm'),
           h('div', { class: 'cartline__main' },
             h('div', { class: 'cartline__name' }, l.name),
-            h('div', { class: 'small muted mono' }, `${money(l.price, ctx.state.settings.currency)} each`),
+            h('div', { class: 'small muted mono' }, t('cart.each', { money: money(l.price, ctx.state.settings.currency) })),
             h('div', { class: 'row', style: 'margin-top:7px' },
               stepper(l.qty, (n) => { setQty(ctx.store, l.productId, n); paint(); ctx.syncChrome(); }, l.stock),
               h('button', {
                 class: 'btn btn--ghost btn--sm', type: 'button',
                 onclick: () => { setQty(ctx.store, l.productId, 0); paint(); ctx.syncChrome(); },
-              }, 'Remove'))),
+              }, t('cart.remove')))),
           h('div', { class: 'mono', style: 'font-weight:600' }, money(l.price * l.qty, ctx.state.settings.currency))));
       });
 
       const codeInput = h('input', {
-        class: 'input', placeholder: 'Discount code', value: ctx.state.cart.code || '',
-        'aria-label': 'Discount code',
+        class: 'input', placeholder: t('cart.code'), value: ctx.state.cart.code || '',
+        'aria-label': t('cart.code'),
       });
       body.appendChild(h('div', { class: 'codebox' }, codeInput,
         h('button', {
@@ -116,26 +117,31 @@ export function showCart(ctx) {
             const raw = codeInput.value.trim().toUpperCase();
             if (!raw) { ctx.store.update((s) => { s.cart.code = ''; }); paint(); return; }
             const d = discountByCode(ctx.state, raw);
-            if (!d || !d.active) { toast('That code is not active', 'bad'); return; }
+            if (!d || !d.active) { toast(t('cart.notActive'), 'bad'); return; }
             if (subtotal < d.minOrder) {
-              toast(`${raw} needs a basket of ${money(d.minOrder, ctx.state.settings.currency)} or more`, 'bad');
+              toast(t('cart.needs', { code: raw, money: money(d.minOrder, ctx.state.settings.currency) }), 'bad');
               return;
             }
             ctx.store.update((s) => { s.cart.code = raw; });
-            toast(`${raw} applied`, 'ok');
+            toast(t('cart.applied', { code: raw }), 'ok');
             paint();
           },
-        }, 'Apply')));
+        }, t('cart.apply'))));
       if (code && discountAmt > 0) {
-        body.appendChild(h('p', { class: 'hint' },
-          `${code.code} — ${code.kind === 'pct' ? `${code.value}% off` : `${money(code.value, ctx.state.settings.currency)} off`} on baskets over ${money(code.minOrder, ctx.state.settings.currency)}.`));
+        body.appendChild(h('p', { class: 'hint' }, t('cart.codeHint', {
+          code: code.code,
+          off: code.kind === 'pct'
+            ? t('cart.pctOff', { value: code.value })
+            : t('cart.flatOff', { money: money(code.value, ctx.state.settings.currency) }),
+          min: money(code.minOrder, ctx.state.settings.currency),
+        })));
       }
 
       body.appendChild(h('div', { class: 'totals' },
-        totalRow('Subtotal', money(subtotal, ctx.state.settings.currency)),
-        discountAmt ? totalRow(`Discount ${code ? code.code : ''}`, `− ${money(discountAmt, ctx.state.settings.currency)}`) : null,
-        totalRow(`Tax ${ctx.state.settings.taxPct}%`, money(tax, ctx.state.settings.currency)),
-        h('div', { class: 'totals__row totals__row--grand' }, h('span', {}, 'Total'), h('strong', {}, money(total, ctx.state.settings.currency)))));
+        totalRow(t('common.subtotal'), money(subtotal, ctx.state.settings.currency)),
+        discountAmt ? totalRow(t('cart.discountRow', { code: code ? code.code : '' }), `− ${money(discountAmt, ctx.state.settings.currency)}`) : null,
+        totalRow(t('cart.taxRow', { pct: ctx.state.settings.taxPct }), money(tax, ctx.state.settings.currency)),
+        h('div', { class: 'totals__row totals__row--grand' }, h('span', {}, t('common.total')), h('strong', {}, money(total, ctx.state.settings.currency)))));
     }
     drawer.appendChild(body);
 
@@ -143,11 +149,11 @@ export function showCart(ctx) {
       h('button', {
         class: 'btn btn--primary btn--block', type: 'button', disabled: !lines.length,
         onclick: () => { closeCart(); ctx.nav('checkout'); },
-      }, 'Go to checkout'),
+      }, t('cart.checkout')),
       lines.length ? h('button', {
         class: 'btn btn--ghost btn--block', type: 'button', style: 'margin-top:8px',
         onclick: () => { clearCart(ctx.store); paint(); ctx.syncChrome(); },
-      }, 'Empty the cart') : null));
+      }, t('cart.clear')) : null));
   };
 
   paint();
@@ -158,9 +164,9 @@ export function stepper(value, onChange, max = 99) {
   const out = h('output', {}, String(value));
   const set = (n) => { const v = Math.max(0, Math.min(n, max)); out.textContent = String(v); onChange(v); };
   return h('div', { class: 'qty' },
-    h('button', { type: 'button', 'aria-label': 'Decrease quantity', onclick: () => set(Number(out.textContent) - 1), html: '<svg viewBox="0 0 20 20"><path d="M4 10h12"/></svg>' }),
+    h('button', { type: 'button', 'aria-label': t('cart.dec'), onclick: () => set(Number(out.textContent) - 1), html: '<svg viewBox="0 0 20 20"><path d="M4 10h12"/></svg>' }),
     out,
-    h('button', { type: 'button', 'aria-label': 'Increase quantity', onclick: () => set(Number(out.textContent) + 1), html: icon('plus') }));
+    h('button', { type: 'button', 'aria-label': t('cart.inc'), onclick: () => set(Number(out.textContent) + 1), html: icon('plus') }));
 }
 
 export function totalRow(label, value) {

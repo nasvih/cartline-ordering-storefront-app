@@ -5,6 +5,8 @@ import {
   dayKey, dayLabel, lastDays, daySummary, topItems, revenueByHour, revenueByCategory, ordersOn,
 } from '../data.js';
 import { openOrder } from '../orderops.js';
+import { t } from '../main.js';
+import { tr, L } from '../strings.js';
 
 const CHANNEL_TONE = { Counter: 'var(--amber-fill)', Pickup: 'var(--ok)', Delivery: 'var(--info)' };
 
@@ -14,10 +16,10 @@ export default function renderSummary(ctx) {
 
   wrap.appendChild(h('div', { class: 'page-head' },
     h('div', { style: 'flex:1;min-width:0' },
-      h('h1', {}, 'Day summary'),
-      h('p', {}, 'One day at a time. Place an order on the storefront and these numbers move immediately — nothing here is precomputed.')),
+      h('h1', {}, t('route.summary.title')),
+      h('p', {}, t('summary.sub'))),
     h('div', { class: 'btnrow' },
-      h('button', { class: 'btn', type: 'button', html: `${icon('download')}<span>Export day</span>`, onclick: () => exportDay(ctx, day) }))));
+      h('button', { class: 'btn', type: 'button', html: `${icon('download')}<span>${t('summary.exportDay')}</span>`, onclick: () => exportDay(ctx, day) }))));
 
   const picker = h('div', { class: 'daypick' });
   lastDays(7).forEach((k) => {
@@ -45,70 +47,76 @@ export default function renderSummary(ctx) {
     const prevKey = lastDays(8)[lastDays(8).indexOf(day) + 1];
     const prev = prevKey ? daySummary(ctx.state, prevKey) : null;
     const delta = (now, before) => {
-      if (!before) return 'No day before it in the sample';
-      if (!before && !now) return 'flat';
+      if (!before) return t('summary.noDayBefore');
+      if (!before && !now) return t('summary.flat');
       const d = now - before;
       const sign = d > 0 ? '+' : '';
-      return `${sign}${Math.round(before ? (d / before) * 100 : 100)}% against ${dayLabel(prevKey).toLowerCase()}`;
+      return t('summary.delta', {
+        sign,
+        pct: Math.round(before ? (d / before) * 100 : 100),
+        day: dayLabel(prevKey).toLowerCase(),
+      });
     };
 
     host.innerHTML = '';
     host.appendChild(h('div', { class: 'grid g4', style: 'margin-bottom:20px' },
-      stat('Orders', num(s.orders), `${num(s.billable)} billable · ${num(s.cancelled)} cancelled`, true),
-      stat('Gross revenue', money(s.gross, cur), prev ? delta(s.gross, prev.gross) : ''),
-      stat('Average order value', money(s.aov, cur), `${num(s.items)} items sold`),
-      stat('Refunds', money(s.refunds, cur), `${num(s.refundCount)} orders refunded`)));
+      stat(t('summary.orders'), num(s.orders), t('summary.billableLine', { billable: num(s.billable), cancelled: num(s.cancelled) }), true),
+      stat(t('summary.gross'), money(s.gross, cur), prev ? delta(s.gross, prev.gross) : ''),
+      stat(t('summary.aov'), money(s.aov, cur), t('summary.itemsSold', { n: num(s.items) })),
+      stat(t('summary.refunds'), money(s.refunds, cur), t('summary.refundedOrders', { n: num(s.refundCount) }))));
 
     const hours = revenueByHour(ctx.state, day);
     const busiest = hours.slice().sort((a, b) => b.value - a.value)[0];
     host.appendChild(h('div', { class: 'grid g-side', style: 'margin-bottom:20px;align-items:start' },
       h('section', { class: 'card' },
         h('div', { class: 'card__head' },
-          h('h3', {}, 'Revenue by hour'),
-          h('span', { class: 'label' }, busiest && busiest.value ? `Busiest ${busiest.label}:00` : 'Quiet day')),
+          h('h3', {}, t('summary.byHour')),
+          h('span', { class: 'label' }, busiest && busiest.value ? t('summary.busiest', { hour: busiest.label }) : t('summary.quietDay'))),
         barChart(hours, { format: (v) => money(v, cur) }),
-        h('p', { class: 'hint' }, `Each column is one trading hour, ${hours[0].label}:00 to ${hours[hours.length - 1].label}:00.`)),
+        h('p', { class: 'hint' }, t('summary.hourHint', { from: hours[0].label, to: hours[hours.length - 1].label }))),
       h('aside', { class: 'card' },
-        h('div', { class: 'card__head' }, h('h3', {}, 'Net after refunds')),
+        h('div', { class: 'card__head' }, h('h3', {}, t('summary.net'))),
         h('p', { class: 'stat__value' }, money(s.net, cur)),
-        h('p', { class: 'small muted' }, `Gross ${money(s.gross, cur)} less ${money(s.refunds, cur)} refunded.`),
+        h('p', { class: 'small muted' }, t('summary.netLine', { gross: money(s.gross, cur), refunds: money(s.refunds, cur) })),
         h('hr', { class: 'hr' }),
         h('dl', { class: 'kv' },
-          h('dt', {}, 'Discounts'), h('dd', { class: 'mono' }, money(s.discount, cur)),
-          h('dt', {}, 'Items'), h('dd', { class: 'mono' }, num(s.items)),
-          h('dt', {}, 'Basket'), h('dd', { class: 'mono' }, money(s.aov, cur)),
-          h('dt', {}, 'Refund rate'), h('dd', { class: 'mono' }, pct(s.billable ? (s.refundCount / s.billable) * 100 : 0, 1))),
+          h('dt', {}, t('summary.discounts')), h('dd', { class: 'mono' }, money(s.discount, cur)),
+          h('dt', {}, t('common.items')), h('dd', { class: 'mono' }, num(s.items)),
+          h('dt', {}, t('summary.basket')), h('dd', { class: 'mono' }, money(s.aov, cur)),
+          h('dt', {}, t('summary.refundRate')), h('dd', { class: 'mono' }, pct(s.billable ? (s.refundCount / s.billable) * 100 : 0, 1))),
         channelSplit(ctx, day))));
 
     const items = topItems(ctx.state, day, 8);
     const cats = revenueByCategory(ctx.state, day).sort((a, b) => b.value - a.value);
     host.appendChild(h('div', { class: 'grid g2', style: 'margin-bottom:20px' },
       h('section', { class: 'card' },
-        h('div', { class: 'card__head' }, h('h3', {}, 'Top items')),
+        h('div', { class: 'card__head' }, h('h3', {}, t('summary.topItems'))),
         items.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'data' },
-          h('thead', {}, h('tr', {}, h('th', {}, 'Item'), h('th', { class: 'right' }, 'Sold'), h('th', { class: 'right' }, 'Revenue'))),
+          h('thead', {}, h('tr', {}, h('th', {}, t('common.item')), h('th', { class: 'right' }, t('common.sold')), h('th', { class: 'right' }, t('common.revenue')))),
           h('tbody', {}, items.map((it) => h('tr', {},
             h('td', {}, it.name),
             h('td', { class: 'right mono' }, num(it.qty)),
             h('td', { class: 'right mono' }, money(it.revenue, cur)))))))
-          : h('div', { class: 'empty' }, h('h3', {}, 'Nothing sold on this day'))),
+          : h('div', { class: 'empty' }, h('h3', {}, t('summary.nothingSold')))),
       h('section', { class: 'card' },
-        h('div', { class: 'card__head' }, h('h3', {}, 'Revenue by category')),
+        h('div', { class: 'card__head' }, h('h3', {}, t('summary.byCategory'))),
         barChart(cats, { format: (v) => money(v, cur), muted: (x) => x.value === 0 }))));
 
     const list = ordersOn(ctx.state, day).slice().sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
     host.appendChild(h('section', { class: 'card' },
-      h('div', { class: 'card__head' }, h('h3', {}, `Orders on ${dayLabel(day).toLowerCase()}`), h('span', { class: 'label' }, `${num(list.length)} records`)),
+      h('div', { class: 'card__head' }, h('h3', {}, t('summary.ordersOn', { day: dayLabel(day).toLowerCase() })), h('span', { class: 'label' }, t('summary.records', { n: num(list.length) }))),
       list.length ? h('div', { class: 'tablewrap tablewrap--scroll' }, h('table', { class: 'data' },
-        h('thead', {}, h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Time'), h('th', {}, 'Customer'), h('th', {}, 'Channel'), h('th', { class: 'right' }, 'Total'), h('th', {}, 'Status'))),
+        h('thead', {}, h('tr', {}, h('th', {}, t('common.order')), h('th', {}, t('common.time')), h('th', {}, t('common.customer')), h('th', {}, t('common.channel')), h('th', { class: 'right' }, t('common.total')), h('th', {}, t('common.status')))),
         h('tbody', {}, list.map((o) => h('tr', {},
           h('td', {}, h('span', { class: 'linkish mono', role: 'button', tabindex: '0', onclick: () => openOrder(ctx, o.id, paint), onkeydown: (e) => { if (e.key === 'Enter') openOrder(ctx, o.id, paint); } }, o.no)),
           h('td', { class: 'mono small' }, fmtTime(o.placedAt)),
           h('td', {}, o.customer),
-          h('td', { class: 'small muted' }, o.channel),
+          h('td', { class: 'small muted' }, t(`data.channel.${o.channel}`)),
           h('td', { class: 'right mono' }, money(o.total, cur)),
-          h('td', { class: 'small' }, o.status === 'refunded' && o.refund ? `Refunded — ${o.refund.reason}` : o.status))))))
-        : h('div', { class: 'empty' }, h('h3', {}, 'No orders on this day'))));
+          h('td', { class: 'small' }, o.status === 'refunded' && o.refund
+            ? t('summary.refundedCell', { reason: tr('refundReason', o.refund.reason) })
+            : t(`data.statusRaw.${o.status}`)))))))
+        : h('div', { class: 'empty' }, h('h3', {}, t('summary.noOrders')))));
   }
 
   paint();
@@ -129,28 +137,30 @@ function channelSplit(ctx, day) {
     channel: c,
     value: list.filter((o) => o.channel === c).reduce((s, o) => s + o.total, 0),
   }));
-  const bar = h('div', { class: 'split', role: 'img', 'aria-label': rows.map((r) => `${r.channel} ${Math.round((r.value / total) * 100)}%`).join(', ') },
+  const bar = h('div', { class: 'split', role: 'img', 'aria-label': rows.map((r) => `${t(`data.channel.${r.channel}`)} ${Math.round((r.value / total) * 100)}%`).join(', ') },
     rows.map((r) => h('i', { style: `width:${(r.value / total) * 100}%;background:${CHANNEL_TONE[r.channel]}` })));
   return h('div', { style: 'margin-top:16px' },
-    h('p', { class: 'label', style: 'margin-bottom:8px' }, 'Revenue by channel'),
+    h('p', { class: 'label', style: 'margin-bottom:8px' }, t('summary.byChannel')),
     bar,
     h('div', { class: 'legend' }, rows.map((r) => h('span', {},
       h('i', { class: 'swatch', style: `background:${CHANNEL_TONE[r.channel]}` }),
-      `${r.channel} ${Math.round((r.value / total) * 100)}%`))));
+      /* The share is a Latin run — isolate it so it does not slide into the
+         Arabic label beside it. `L` is a no-op in English. */
+      `${t(`data.channel.${r.channel}`)} ${L(`${Math.round((r.value / total) * 100)}%`)}`))));
 }
 
 function exportDay(ctx, day) {
   const s = daySummary(ctx.state, day);
   const rows = [
-    ['Cartline day summary', day],
+    [t('summary.csvTitle'), day],
     [],
-    ['Orders', s.orders], ['Billable', s.billable], ['Cancelled', s.cancelled],
-    ['Gross revenue', s.gross], ['Refunds', s.refunds], ['Net revenue', s.net],
-    ['Average order value', s.aov], ['Items sold', s.items], ['Discount given', s.discount],
+    [t('summary.csvOrders'), s.orders], [t('summary.csvBillable'), s.billable], [t('summary.csvCancelled'), s.cancelled],
+    [t('summary.csvGross'), s.gross], [t('summary.csvRefunds'), s.refunds], [t('summary.csvNet'), s.net],
+    [t('summary.csvAov'), s.aov], [t('summary.csvItems'), s.items], [t('summary.csvDiscount'), s.discount],
     [],
-    ['Top items', 'Sold', 'Revenue'],
+    [t('summary.csvTop'), t('common.sold'), t('common.revenue')],
     ...topItems(ctx.state, day, 10).map((it) => [it.name, it.qty, it.revenue]),
   ];
   downloadCSV(`cartline-summary-${day}.csv`, rows);
-  toast(`Summary for ${dayLabel(day).toLowerCase()} exported`, 'ok');
+  toast(t('summary.exported', { day: dayLabel(day).toLowerCase() }), 'ok');
 }

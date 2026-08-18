@@ -2,7 +2,12 @@
    Cartline — boot: store, shell, navigation, router, assistant.
    ============================================================ */
 
-import { h, qs, icon, createStore, router, toast, confirmDialog, modal } from '../lib/ui.js';
+import {
+  h, qs, icon, createStore, router, toast, confirmDialog, modal,
+  setRelativeText, setDialogText,
+} from '../lib/ui.js';
+import { createI18n } from '../lib/i18n.js';
+import { STRINGS } from './strings.js';
 import { STORAGE_KEY, seedState, dayKey, lowStock } from './data.js';
 import { cartCount, toggleCart, closeCart } from './cart.js';
 import { closeOrder } from './orderops.js';
@@ -22,23 +27,48 @@ import renderDiscounts from './views/discounts.js';
 import renderSummary from './views/summary.js';
 import renderSettings from './views/settings.js';
 
+/* ---------- language ----------
+   One instance for the whole app; every other module imports `t` from here.
+   It has already written lang/dir onto <html> by the time this line returns —
+   the inline script in index.html did it a frame earlier so nothing flashes. */
+const i18n = createI18n({ key: 'cartline', dict: STRINGS });
+export const t = i18n.t;
+export const tlist = i18n.list;
+
+/* The two places the shared runtime speaks for itself. */
+setRelativeText({
+  now: () => t('ui.relNow'),
+  min: (n) => t('ui.relMin', { n }),
+  hour: (n) => t('ui.relHour', { n }),
+  day: (n) => t('ui.relDay', { n }),
+});
+setDialogText({
+  title: t('ui.confirmTitle'),
+  ok: t('ui.confirmOk'),
+  cancel: t('ui.cancel'),
+  close: t('ui.closeDialog'),
+});
+
 const store = createStore(STORAGE_KEY, seedState);
 
+const SHOP = t('face.shop');
+const OPS = t('face.ops');
+
 const ROUTES = {
-  shop: { face: 'shop', label: 'Shop', icon: 'grid', title: 'Shop', sub: 'Storefront', render: renderShop },
-  checkout: { face: 'shop', label: 'Checkout', icon: 'cart', title: 'Checkout', sub: 'Storefront', render: renderCheckout },
-  track: { face: 'shop', label: 'Track an order', icon: 'search', title: 'Track an order', sub: 'Storefront', render: renderTrack },
-  board: { face: 'ops', label: 'Order board', icon: 'flow', title: 'Order board', sub: 'Operations', render: renderBoard },
-  orders: { face: 'ops', label: 'Orders', icon: 'table', title: 'Orders', sub: 'Operations', render: renderOrders },
-  products: { face: 'ops', label: 'Products and stock', icon: 'box', title: 'Products and stock', sub: 'Operations', render: renderProducts },
-  discounts: { face: 'ops', label: 'Discount codes', icon: 'tag', title: 'Discount codes', sub: 'Operations', render: renderDiscounts },
-  summary: { face: 'ops', label: 'Day summary', icon: 'chart', title: 'Day summary', sub: 'Operations', render: renderSummary },
-  settings: { face: 'ops', label: 'Store settings', icon: 'cog', title: 'Store settings', sub: 'Operations', render: renderSettings },
+  shop: { face: 'shop', label: t('route.shop.label'), icon: 'grid', title: t('route.shop.title'), sub: SHOP, render: renderShop },
+  checkout: { face: 'shop', label: t('route.checkout.label'), icon: 'cart', title: t('route.checkout.title'), sub: SHOP, render: renderCheckout },
+  track: { face: 'shop', label: t('route.track.label'), icon: 'search', title: t('route.track.title'), sub: SHOP, render: renderTrack },
+  board: { face: 'ops', label: t('route.board.label'), icon: 'flow', title: t('route.board.title'), sub: OPS, render: renderBoard },
+  orders: { face: 'ops', label: t('route.orders.label'), icon: 'table', title: t('route.orders.title'), sub: OPS, render: renderOrders },
+  products: { face: 'ops', label: t('route.products.label'), icon: 'box', title: t('route.products.title'), sub: OPS, render: renderProducts },
+  discounts: { face: 'ops', label: t('route.discounts.label'), icon: 'tag', title: t('route.discounts.title'), sub: OPS, render: renderDiscounts },
+  summary: { face: 'ops', label: t('route.summary.label'), icon: 'chart', title: t('route.summary.title'), sub: OPS, render: renderSummary },
+  settings: { face: 'ops', label: t('route.settings.label'), icon: 'cog', title: t('route.settings.title'), sub: OPS, render: renderSettings },
 };
 
 const FACES = [
-  { id: 'shop', label: 'Storefront', icon: 'cart', home: 'shop' },
-  { id: 'ops', label: 'Operations', icon: 'chart', home: 'board' },
+  { id: 'shop', label: SHOP, icon: 'cart', home: 'shop' },
+  { id: 'ops', label: OPS, icon: 'chart', home: 'board' },
 ];
 
 let current = 'shop';
@@ -75,21 +105,21 @@ const app = qs('#app');
 app.appendChild(h('div', { class: 'shell' },
   h('aside', { class: 'side', id: 'side' },
     h('div', { class: 'side__brand' },
-      h('span', { class: 'mark' }, 'CL'),
+      h('span', { class: 'mark' }, t('app.mark')),
       h('div', {},
-        h('div', { class: 'side__name' }, 'Cartline'),
-        h('div', { class: 'side__tag' }, 'Ordering and storefront')),
+        h('div', { class: 'side__name' }, t('app.name')),
+        h('div', { class: 'side__tag' }, t('app.tag'))),
       /* the two controls that change the sidebar itself live on the sidebar */
       h('div', { class: 'side__brandbtns' },
         h('button', {
           class: 'btn', type: 'button', id: 'tonebtn', 'aria-pressed': 'false',
-          html: `${TONE_ICON}<span>Sidebar colour</span>`,
+          html: `${TONE_ICON}<span>${t('side.tone')}</span>`,
         }),
         h('button', {
           class: 'btn railbtn', type: 'button', id: 'railbtn', 'aria-pressed': 'false',
-          html: `${RAIL_ICON}<span>Collapse sidebar</span>`,
+          html: `${RAIL_ICON}<span>${t('side.collapse')}</span>`,
         }))),
-    h('nav', { class: 'side__nav', id: 'nav', 'aria-label': 'Sections' }),
+    h('nav', { class: 'side__nav', id: 'nav', 'aria-label': t('nav.sections') }),
     h('div', { class: 'side__foot' },
       /* "About this demo" is a topbar control, not a sidebar one — it opens
          from the button beside the notifications bell. */
@@ -97,16 +127,16 @@ app.appendChild(h('div', { class: 'shell' },
         h('a', {
           class: 'btn sitelink', id: 'sitelink',
           href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener noreferrer',
-          title: 'nasvih.in — opens in a new tab',
-          'aria-label': 'nasvih.in, opens in a new tab',
+          title: t('side.siteTitle'),
+          'aria-label': t('side.siteAria'),
           html: `${EXTERNAL_ICON}<span>nasvih.in</span>`,
         }),
         h('a', {
           class: 'btn', id: 'sourcelink',
           href: SOURCE_URL, target: '_blank', rel: 'noopener noreferrer',
-          title: 'GitHub — opens in a new tab',
-          'aria-label': 'GitHub, opens in a new tab',
-          html: `${SOURCE_ICON}<span>GitHub</span>`,
+          title: t('side.githubTitle'),
+          'aria-label': t('side.githubAria'),
+          html: `${SOURCE_ICON}<span>${t('side.github')}</span>`,
         })),
       /* the install control is added here at runtime, before Reset, and stays
          hidden until the browser offers an install — so this row is one
@@ -114,40 +144,40 @@ app.appendChild(h('div', { class: 'shell' },
       h('div', { class: 'side__pair', id: 'footpair' },
         h('button', {
           class: 'btn', type: 'button', id: 'resetbtn',
-          title: 'Reset demo data', 'aria-label': 'Reset demo data',
-          html: `${icon('refresh')}<span>Reset demo data</span>`,
+          title: t('side.reset'), 'aria-label': t('side.reset'),
+          html: `${icon('refresh')}<span>${t('side.reset')}</span>`,
         })),
       h('p', { class: 'hint side__sub', id: 'sidehint', style: 'margin-top:10px' },
-        'Sample data only. Nothing you enter leaves this browser.'))),
+        t('side.hint')))),
   /* Below 900px the sidebar is a drawer laid over the page, and it covers the
      burger that opened it. Without a ground to tap, a touch screen has no way
      to dismiss it — Escape is a keyboard, and a phone has none. */
   h('button', {
     class: 'sidescrim', type: 'button', id: 'sidescrim', tabindex: '-1',
-    'aria-label': 'Close navigation',
+    'aria-label': t('side.closeNav'),
   }),
   h('div', { class: 'main' },
     h('header', { class: 'topbar' },
       h('button', {
         class: 'btn btn--ghost btn--icon sidebtn', id: 'menubtn',
-        'aria-label': 'Open navigation', 'aria-expanded': 'false', html: icon('menu'),
+        'aria-label': t('topbar.openNav'), 'aria-expanded': 'false', html: icon('menu'),
       }),
       h('div', { class: 'topbar__store' },
-        h('span', { class: 'topbar__title', id: 'ttl' }, 'Shop'),
-        h('span', { class: 'topbar__sub', id: 'sub' }, 'Storefront')),
+        h('span', { class: 'topbar__title', id: 'ttl' }, ROUTES.shop.title),
+        h('span', { class: 'topbar__sub', id: 'sub' }, SHOP)),
       h('div', { class: 'spacer' }),
-      h('div', { class: 'faceswitch', id: 'faceswitch', role: 'group', 'aria-label': 'Switch between the storefront and operations' }),
+      h('div', { class: 'faceswitch', id: 'faceswitch', role: 'group', 'aria-label': t('face.switchAria') }),
       h('div', { class: 'topbar__tools', id: 'tools' },
         h('button', {
           class: 'btn btn--ghost btn--icon cartbtn', id: 'cartbtn',
-          'aria-label': 'Open cart', title: 'Cart',
+          'aria-label': t('topbar.openCart'), title: t('topbar.cart'),
           html: `${icon('cart')}<span class="cartbtn__count" id="cartcount" hidden>0</span>`,
         })),
       h('button', {
         class: 'btn btn--ghost aboutbtn', type: 'button', id: 'demopill',
-        title: 'About this demo — everything here is local sample data, and orders, stock and payments are simulated in this browser',
-        'aria-label': 'About this demo',
-        html: `${INFO_ICON}<span>About this demo</span>`,
+        title: t('topbar.aboutTitle'),
+        'aria-label': t('topbar.about'),
+        html: `${INFO_ICON}<span>${t('topbar.about')}</span>`,
       })),
     h('main', { class: 'view view--pad', id: 'view', tabindex: '-1' }))));
 
@@ -191,7 +221,7 @@ function applyPrefs() {
   const railable = wide.matches;
   shellEl.classList.toggle('is-rail', prefs.rail && railable);
   railBtn.setAttribute('aria-pressed', String(prefs.rail));
-  const railLabel = prefs.rail ? 'Expand sidebar' : 'Collapse sidebar';
+  const railLabel = prefs.rail ? t('side.expand') : t('side.collapse');
   railBtn.title = railLabel;
   railBtn.setAttribute('aria-label', railLabel);
   railBtn.querySelector('span').textContent = railLabel;
@@ -201,8 +231,8 @@ function applyPrefs() {
   const amber = prefs.tone === 'amber';
   if (amber) sideEl.dataset.tone = 'amber'; else delete sideEl.dataset.tone;
   toneBtn.setAttribute('aria-pressed', String(amber));
-  toneBtn.title = 'Sidebar colour';
-  toneBtn.setAttribute('aria-label', 'Sidebar colour');
+  toneBtn.title = t('side.tone');
+  toneBtn.setAttribute('aria-label', t('side.tone'));
 }
 
 railBtn.addEventListener('click', () => { prefs.rail = !prefs.rail; savePrefs(); applyPrefs(); });
@@ -217,59 +247,59 @@ qs('#cartbtn').addEventListener('click', () => toggleCart(ctx));
 
 function aboutDemo() {
   modal({
-    title: 'About this demo',
+    title: t('about.title'),
     width: '560px',
     body: h('div', { class: 'stack' },
       h('section', {},
-        h('h4', {}, 'What this is'),
-        h('p', { class: 'muted small' }, 'Cartline is an ordering and storefront application with two faces over one set of records. Customers browse the catalogue, fill a cart and check out on the storefront; the shop runs the day on the operations side — the order board, products and stock, discount codes and the day summary.'),
-        h('p', { class: 'muted small', style: 'margin-top:6px' }, 'They are not two systems. An order placed on the storefront is the same record the board moves from new to preparing to ready, the same record that took stock down and the same record the day summary counts.')),
+        h('h4', {}, t('about.whatH')),
+        h('p', { class: 'muted small' }, t('about.whatP1')),
+        h('p', { class: 'muted small', style: 'margin-top:6px' }, t('about.whatP2'))),
       h('section', {},
-        h('h4', {}, 'Where it helps a business'),
+        h('h4', {}, t('about.helpsH')),
         h('ul', { class: 'muted small ticks' },
-          h('li', {}, 'Orders arrive as records rather than as messages, so nothing is missed at a busy hour.'),
-          h('li', {}, 'The kitchen or counter works one board instead of a stack of chits.'),
-          h('li', {}, 'Stock counts move as orders are placed, so what is nearly out is visible before it runs out.'),
-          h('li', {}, 'Refunds carry a reason, which is what makes them reviewable later.'),
-          h('li', {}, "The day's takings, average order value and best sellers are a screen rather than an evening's arithmetic."))),
+          h('li', {}, t('about.helps1')),
+          h('li', {}, t('about.helps2')),
+          h('li', {}, t('about.helps3')),
+          h('li', {}, t('about.helps4')),
+          h('li', {}, t('about.helps5')))),
       h('section', {},
-        h('h4', {}, 'How it would work for real'),
-        h('p', { class: 'muted small' }, 'The same interface, with browser storage swapped for a real database, a real payment provider in place of the simulated step, staff accounts so actions are attributable, and printing or a counter display for the kitchen. What you are looking at is the interface and the workflow, not the production system behind them.')),
+        h('h4', {}, t('about.realH')),
+        h('p', { class: 'muted small' }, t('about.realP'))),
       h('section', {},
-        h('h4', {}, 'Ask the assistant to do it'),
-        h('p', { class: 'muted small' }, 'Cartline Assist reads this store and changes it. Type one of these into the launcher at the bottom right; it names the exact record, shows you the before and after, and waits for you to press the button before anything is written.'),
-        h('div', { class: 'exlist' }, ACTION_EXAMPLES.map((e) => h('div', { class: 'ex' },
+        h('h4', {}, t('about.askH')),
+        h('p', { class: 'muted small' }, t('about.askP')),
+        h('div', { class: 'exlist' }, ACTION_EXAMPLES().map((e) => h('div', { class: 'ex' },
           h('div', { class: 'ex__ask mono' }, e.ask),
           h('div', { class: 'ex__out muted small' }, e.reply)))),
-        h('p', { class: 'muted small', style: 'margin-top:12px' }, 'It answers questions from the same records, with today\'s numbers rather than a canned reply:'),
-        h('div', { class: 'exlist' }, READ_EXAMPLES.map((e) => h('div', { class: 'ex' },
+        h('p', { class: 'muted small', style: 'margin-top:12px' }, t('about.readsP')),
+        h('div', { class: 'exlist' }, READ_EXAMPLES().map((e) => h('div', { class: 'ex' },
           h('div', { class: 'ex__ask mono' }, e.ask),
           h('div', { class: 'ex__out muted small' }, e.reply))))),
       h('section', {},
-        h('h4', {}, 'How this demo works'),
+        h('h4', {}, t('about.worksH')),
         h('ul', { class: 'muted small ticks' },
-          h('li', {}, 'You can actually use it. Place an order, move it across the board, edit a product, change a price, pause a discount code or refund an order — every screen writes to the store the others read.'),
-          h('li', {}, `Your data stays on your machine, in this browser's local storage under ${STORAGE_KEY}. There is no account and no backend. "Reset demo data" clears it, and it does not sync between browsers or devices.`),
-          h('li', {}, 'The payment step is simulated. No card details are asked for, taken or sent anywhere.'),
-          h('li', {}, "Cartline Assist is simulated too. It answers, and acts, by matching what you type against this app's own demo data — a demonstration of the interaction, not a connected model."),
-          h('li', {}, 'The topbar carries three view controls: notifications built from the live records, a phone preview that runs the app inside a 390 by 844 frame, and a dark mode that follows your system until you pick a side.'))),
+          h('li', {}, t('about.works1')),
+          h('li', {}, t('about.works2', { key: STORAGE_KEY })),
+          h('li', {}, t('about.works3')),
+          h('li', {}, t('about.works4')),
+          h('li', {}, t('about.works5')))),
       h('section', {},
-        h('p', { class: 'muted small' }, 'The source is published so it can be read and evaluated. It is not open source: copying, modifying, redistributing or reusing it needs written permission.'),
+        h('p', { class: 'muted small' }, t('about.licenceP')),
         h('a', {
           class: 'btn', style: 'margin-top:10px',
           href: SOURCE_URL, target: '_blank', rel: 'noopener noreferrer',
-          'aria-label': 'GitHub, opens in a new tab',
-          html: `${SOURCE_ICON}<span>GitHub</span>`,
+          'aria-label': t('side.githubAria'),
+          html: `${SOURCE_ICON}<span>${t('side.github')}</span>`,
         }))),
-    actions: [{ label: 'Close', class: 'btn--primary' }],
+    actions: [{ label: t('common.close'), class: 'btn--primary' }],
   });
 }
 
 qs('#demopill').addEventListener('click', aboutDemo);
 qs('#resetbtn').addEventListener('click', async () => {
   const ok = await confirmDialog(
-    'This clears every order, product edit and discount change you made here and rebuilds the original sample data.',
-    { title: 'Reset demo data', okLabel: 'Reset', danger: true },
+    t('reset.body'),
+    { title: t('reset.title'), okLabel: t('reset.ok'), danger: true },
   );
   if (!ok) return;
   store.reset();
@@ -277,7 +307,7 @@ qs('#resetbtn').addEventListener('click', async () => {
   closeOrder();
   paintView();
   syncChrome();
-  toast('Demo data reset', 'ok');
+  toast(t('reset.done'), 'ok');
 });
 
 /* ---------- navigation ---------- */
@@ -291,8 +321,8 @@ function buildNav() {
          the text is hidden — the icon must never be the only clue. */
       group.appendChild(h('button', {
         class: 'navlink', type: 'button', dataset: { route: id },
-        title: `${r.label} — ${face.label}`,
-        'aria-label': `${r.label}, ${face.label}`,
+        title: t('nav.title', { label: r.label, face: face.label }),
+        'aria-label': t('nav.aria', { label: r.label, face: face.label }),
         onclick: () => { ctx.nav(id); setSide(false); },
         html: `${icon(r.icon)}<span>${r.label}</span><span class="navlink__count mono" data-count="${id}"></span>`,
       }));
@@ -322,7 +352,7 @@ function syncChrome() {
   const badge = qs('#cartcount');
   badge.textContent = String(count);
   badge.hidden = count === 0;
-  qs('#cartbtn').setAttribute('aria-label', count ? `Open cart, ${count} items` : 'Open cart');
+  qs('#cartbtn').setAttribute('aria-label', count ? t('topbar.openCartN', { n: count }) : t('topbar.openCart'));
 
   const counts = {
     checkout: count || '',
@@ -344,7 +374,7 @@ function syncChrome() {
   });
   qs('#ttl').textContent = ROUTES[current].title;
   qs('#sub').textContent = `${s.settings.storeName} · ${ROUTES[current].sub}`;
-  document.title = `${ROUTES[current].title} — Cartline`;
+  document.title = t('app.docTitle', { title: ROUTES[current].title });
 }
 
 /* ---------- routing ---------- */
@@ -360,7 +390,7 @@ function paintView() {
     node = route.render(ctx, params, query);
   } catch (err) {
     node = h('div', { class: 'empty' },
-      h('h3', {}, 'This screen could not be drawn'),
+      h('h3', {}, t('app.drawFail')),
       h('p', {}, String(err && err.message ? err.message : err)));
   }
   viewEl.appendChild(node);
@@ -392,10 +422,13 @@ nav = router(
 if (isFramed()) document.documentElement.classList.add('is-framed');
 
 const tools = qs('#tools');
-const deviceSwitch = createDeviceSwitch({ appName: 'Cartline' });
+const deviceSwitch = createDeviceSwitch({ appName: t('app.name') });
 if (deviceSwitch) tools.insertBefore(deviceSwitch, qs('#cartbtn'));
 const notifications = createNotifications(ctx);
 tools.appendChild(notifications.node);
+/* Language, then theme, then the device preview the switch already added:
+   the control that changes what every other control says goes first. */
+tools.appendChild(i18n.toggle());
 tools.appendChild(createThemeButton());
 
 buildNav();
@@ -408,8 +441,16 @@ store.subscribe(() => { syncChrome(); notifications.sync(); });
 const footPair = qs('#footpair');
 const installBtn = initPWA({
   mount: footPair,
-  appName: 'Cartline',
+  appName: t('app.name'),
   onNote: (msg) => toast(msg, 'ok'),
+  labels: {
+    install: t('pwa.install'),
+    title: (app) => t('pwa.title', { app }),
+    installed: (app) => t('pwa.installed', { app }),
+    dismissed: t('pwa.dismissed'),
+    ios: t('pwa.ios'),
+    menu: t('pwa.menu'),
+  },
 });
 /* initPWA appends; the install control belongs before Reset in the row */
 if (installBtn) {

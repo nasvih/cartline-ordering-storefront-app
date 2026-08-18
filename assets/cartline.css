@@ -410,3 +410,25 @@
      of text a full row's worth of height to be hit */
   .linkish{display:inline-block;padding:5px 0}
 }
+
+/* == right to left ========================================================
+   Cartline's own rules that name a physical side. The kit sheet mirrors the
+   shell; these mirror the storefront, the board and the notification panel. */
+
+[dir="rtl"] .faceswitch button+button{border-left:0;border-right:1px solid var(--line-2)}
+[dir="rtl"] .cartbtn__count{right:auto;left:-5px}
+[dir="rtl"] .prod,[dir="rtl"] .payopt,[dir="rtl"] .ocard,[dir="rtl"] .notif__main{text-align:right}
+[dir="rtl"] .ocard__foot .btnrow{margin-left:0;margin-right:auto}
+[dir="rtl"] .notif__when{margin-left:0;margin-right:auto}
+[dir="rtl"] .ticks{padding-right:0}
+[dir="rtl"] .ticks li{padding-left:0;padding-right:16px}
+[dir="rtl"] .ticks li::before{left:auto;right:2px}
+[dir="rtl"] .notifpanel{right:auto;left:0}
+[dir="rtl"] .side[data-tone="amber"]{border-right-color:var(--line);border-left-color:#8C3512}
+/* The order number, the SKU and the money column are Latin runs inside an
+   Arabic table — keep them ranged the way their own script reads. */
+[dir="rtl"] .receipt__no,[dir="rtl"] .codecell{direction:ltr;text-align:right}
+
+@media (max-width:900px){
+  [dir="rtl"] .notifpanel{left:8px;right:8px}
+}

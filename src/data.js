@@ -6,6 +6,8 @@
    ============================================================ */
 
 import { seeded, between, pick } from '../lib/ui.js';
+import { catName } from './strings.js';
+import { t } from './main.js';
 
 export const STORAGE_KEY = 'cartline.state.v1';
 
@@ -100,8 +102,11 @@ const PRODUCT_IMAGES = {
 
 /** Photo for a product, or null when it should keep its colour tile. */
 export function productImage(p) {
-  const rec = p && PRODUCT_IMAGES[typeof p === 'string' ? p : p.id];
-  return rec ? { src: `./assets/products/${rec[0]}.png`, alt: rec[1] } : null;
+  const id = typeof p === 'string' ? p : (p && p.id);
+  const rec = id && PRODUCT_IMAGES[id];
+  /* The alt text describes the photograph, so it is a sentence and belongs in
+     the dictionary; the file name never moves. */
+  return rec ? { src: `./assets/products/${rec[0]}.png`, alt: t(`data.productAlt.${id}`) } : null;
 }
 
 const CUSTOMERS = [
@@ -133,10 +138,14 @@ export function startOfDay(d) {
 export function dayLabel(key) {
   const today = dayKey(new Date());
   const y = new Date(); y.setDate(y.getDate() - 1);
-  if (key === today) return 'Today';
-  if (key === dayKey(y)) return 'Yesterday';
+  if (key === today) return t('data.dayLabel.today');
+  if (key === dayKey(y)) return t('data.dayLabel.yesterday');
   const d = new Date(`${key}T12:00:00`);
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
+  /* Arabic weekday and month names, Latin digits — the picker sits above a
+     table whose numbers are Latin, and mixing the two scripts of digit in one
+     column is unreadable. */
+  const locale = document.documentElement.lang === 'ar' ? 'ar-u-nu-latn' : 'en-GB';
+  return d.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
 }
 
 /* ---------- money ---------- */
@@ -391,7 +400,7 @@ export function revenueByHour(state, key) {
 }
 
 export function revenueByCategory(state, key) {
-  const map = new Map(CATEGORIES.map((c) => [c.id, { label: c.name, value: 0, id: c.id }]));
+  const map = new Map(CATEGORIES.map((c) => [c.id, { label: catName(c.id), value: 0, id: c.id }]));
   ordersOn(state, key).filter(isRevenue).forEach((o) => {
     o.items.forEach((it) => {
       const row = map.get(it.category);

@@ -7,9 +7,10 @@
   <meta name="description" content="Cartline is a demo ordering and storefront application: a customer shop with cart and checkout, plus an operations side with an order board, inventory, discount codes and a day summary. All data is local sample data.">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#C24A1C">
-  <!-- Theme before first paint: the stored choice if there is one, the operating
-       system if there is not. Kept inline and tiny so the page never flashes
-       white on the way into dark mode. -->
+  <!-- Theme and language before first paint: the stored choices if there are
+       any. Kept inline and tiny so the page never flashes white on the way into
+       dark mode, and never paints one frame left-to-right on the way into
+       Arabic. The same keys lib/i18n.js and src/chrome.js read later. -->
   <script>
     (function () {
       try {
@@ -21,6 +22,14 @@
           if (m) m.setAttribute('content', '#141517');
         }
       } catch (e) {}
+      try {
+        var l = localStorage.getItem('cartline.lang');
+        if (l === 'ar') {
+          document.documentElement.setAttribute('lang', 'ar');
+          document.documentElement.setAttribute('dir', 'rtl');
+          document.documentElement.classList.add('ar-root');
+        }
+      } catch (e) {}
     }());
   </script>
   <link rel="manifest" href="./manifest.webmanifest">
@@ -28,7 +37,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C24A1C'/%3E%3Cpath d='M8 9h3l2.6 11H23' fill='none' stroke='%23FFFFFF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 12h12l-1.6 6' fill='none' stroke='%23FFFFFF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/app.css">
   <link rel="stylesheet" href="./assets/cartline.css">
 </head>
@@ -36,6 +45,7 @@
   <div id="app"></div>
   <noscript>
     <p style="padding:24px;font-family:system-ui,sans-serif">Cartline runs entirely in the browser and needs JavaScript enabled to render the storefront and the operations board.</p>
+    <p lang="ar" dir="rtl" style="padding:0 24px 24px;font-family:system-ui,sans-serif">يعمل تطبيق Cartline داخل المتصفّح بالكامل، ويحتاج إلى تفعيل جافاسكريبت حتى يعرض واجهة المتجر ولوحة التشغيل.</p>
   </noscript>
   <script type="module" src="./src/main.js"></script>
 </body>

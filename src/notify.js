@@ -13,6 +13,8 @@
 
 import { h, icon, money, num, ago } from '../lib/ui.js';
 import { dayKey, lowStock, STATUSES } from './data.js';
+import { t } from './main.js';
+import { tr } from './strings.js';
 
 const KEY = 'cartline.notifications.v1';
 const CAP = 24;
@@ -43,10 +45,11 @@ export function feed(state) {
       late.add(o.id);
       items.push({
         id: `late-${o.id}`,
-        kind: 'Late',
+        rank: 'Late',
+        kind: t('notify.kindLate'),
         tone: 'warn',
-        title: `${o.no} is ${num(mins)} minutes old`,
-        body: `Still ${o.status} · ${o.customer} · past the ${num(prep)} minute promise`,
+        title: t('notify.lateTitle', { no: o.no, mins: num(mins) }),
+        body: t('notify.lateBody', { status: t(`data.statusRaw.${o.status}`), customer: o.customer, prep: num(prep) }),
         at: o.placedAt,
         route: 'board',
       });
@@ -57,10 +60,11 @@ export function feed(state) {
     if (o.status !== 'new' || late.has(o.id)) return;
     items.push({
       id: `new-${o.id}`,
-      kind: 'New order',
+      rank: 'New order',
+      kind: t('notify.kindNew'),
       tone: 'info',
-      title: `${o.no} is waiting to be started`,
-      body: `${o.customer} · ${o.channel} · ${money(o.total, state.settings.currency)}`,
+      title: t('notify.newTitle', { no: o.no }),
+      body: t('notify.newBody', { customer: o.customer, channel: t(`data.channel.${o.channel}`), money: money(o.total, state.settings.currency) }),
       at: o.placedAt,
       route: 'board',
     });
@@ -69,10 +73,11 @@ export function feed(state) {
   lowStock(state).slice(0, 6).forEach((p) => {
     items.push({
       id: `stock-${p.id}`,
-      kind: p.stock === 0 ? 'Out of stock' : 'Low stock',
+      rank: p.stock === 0 ? 'Out of stock' : 'Low stock',
+      kind: p.stock === 0 ? t('notify.kindOut') : t('notify.kindLow'),
       tone: p.stock === 0 ? 'bad' : 'warn',
-      title: p.stock === 0 ? `${p.name} is out of stock` : `${p.name} is down to ${num(p.stock)}`,
-      body: `${p.sku} · the low-stock line is ${num(state.settings.lowStockAt)} units`,
+      title: p.stock === 0 ? t('notify.outTitle', { name: p.name }) : t('notify.lowTitle', { name: p.name, n: num(p.stock) }),
+      body: t('notify.stockBody', { sku: p.sku, limit: num(state.settings.lowStockAt) }),
       at: null,
       route: 'products',
     });
@@ -83,10 +88,11 @@ export function feed(state) {
     if (dayKey(o.refund.at || o.placedAt) !== today) return;
     items.push({
       id: `refund-${o.id}`,
-      kind: 'Refund',
+      rank: 'Refund',
+      kind: t('notify.kindRefund'),
       tone: 'bad',
-      title: `${o.no} refunded ${money(o.refund.amount, state.settings.currency)}`,
-      body: `${o.customer} · ${o.refund.reason}`,
+      title: t('notify.refundTitle', { no: o.no, money: money(o.refund.amount, state.settings.currency) }),
+      body: t('notify.refundBody', { customer: o.customer, reason: tr('refundReason', o.refund.reason) }),
       at: o.refund.at,
       route: 'orders',
     });
@@ -97,7 +103,7 @@ export function feed(state) {
   const RANK = { Late: 0, 'New order': 1, 'Out of stock': 2, 'Low stock': 3, Refund: 4 };
   const stamp = (n) => (n.at ? new Date(n.at).getTime() : Date.now());
   return items
-    .sort((a, b) => (RANK[a.kind] - RANK[b.kind]) || (stamp(b) - stamp(a)))
+    .sort((a, b) => (RANK[a.rank] - RANK[b.rank]) || (stamp(b) - stamp(a)))
     .slice(0, CAP);
 }
 
@@ -113,14 +119,14 @@ export function createNotifications(ctx) {
   const badge = h('span', { class: 'cartbtn__count', id: 'notifcount', hidden: true }, '0');
   const button = h('button', {
     class: 'btn btn--ghost btn--icon cartbtn', type: 'button',
-    'aria-label': 'Notifications', title: 'Notifications',
+    'aria-label': t('notify.aria'), title: t('notify.title'),
     'aria-expanded': 'false', 'aria-haspopup': 'dialog',
     html: icon('bell'),
   });
   button.appendChild(badge);
 
   const panel = h('div', {
-    class: 'notifpanel', role: 'dialog', 'aria-label': 'Notifications', hidden: true,
+    class: 'notifpanel', role: 'dialog', 'aria-label': t('notify.title'), hidden: true,
   });
   const wrap = h('div', { class: 'notifwrap' }, button, panel);
 
@@ -138,35 +144,35 @@ export function createNotifications(ctx) {
     const unread = unreadOf(list);
     panel.innerHTML = '';
     panel.appendChild(h('header', { class: 'notifpanel__head' },
-      h('h3', { style: 'flex:1' }, 'Notifications'),
-      h('span', { class: `pill${unread.length ? ' pill--amber' : ''} mono` }, unread.length ? `${num(unread.length)} new` : 'All read'),
+      h('h3', { style: 'flex:1' }, t('notify.title')),
+      h('span', { class: `pill${unread.length ? ' pill--amber' : ''} mono` }, unread.length ? t('notify.newPill', { n: num(unread.length) }) : t('notify.allRead')),
       unread.length ? h('button', {
         class: 'btn btn--sm', type: 'button',
         onclick: () => { markRead(list.map((n) => n.id)); paint(); sync(); },
-      }, 'Mark all read') : null));
+      }, t('notify.markAll')) : null));
 
     const body = h('div', { class: 'notiflist' });
     if (!list.length) {
       body.appendChild(h('div', { class: 'empty' },
-        h('h3', {}, 'Nothing needs attention'),
-        h('p', {}, 'No order is waiting or late, nothing is under the low-stock line and no refund has gone through today.')));
+        h('h3', {}, t('notify.emptyH')),
+        h('p', {}, t('notify.emptyP'))));
     } else {
       list.forEach((n) => {
         const isUnread = !prefs.read.includes(n.id);
         const row = h('div', { class: `notif${isUnread ? ' is-unread' : ''}` },
           h('button', {
             class: 'notif__main', type: 'button',
-            'aria-label': `${n.title}. ${n.body}. Open ${n.route}`,
+            'aria-label': t('notify.openAria', { title: n.title, body: n.body, route: t(`route.${n.route}.label`) }),
             onclick: () => { markRead([n.id]); close(); ctx.nav(n.route); },
           },
           h('span', { class: 'notif__top' },
             h('span', { class: `pill pill--${n.tone}` }, n.kind),
-            h('span', { class: 'notif__when mono' }, n.at ? ago(n.at) : 'now')),
+            h('span', { class: 'notif__when mono' }, n.at ? ago(n.at) : t('notify.now'))),
           h('span', { class: 'notif__title' }, n.title),
           h('span', { class: 'notif__body' }, n.body)),
           isUnread ? h('button', {
             class: 'btn btn--ghost btn--icon notif__read', type: 'button',
-            title: 'Mark as read', 'aria-label': `Mark "${n.title}" as read`,
+            title: t('notify.markOne'), 'aria-label': t('notify.markOneAria', { title: n.title }),
             onclick: () => { markRead([n.id]); paint(); sync(); },
             html: icon('check'),
           }, null) : null);
@@ -175,15 +181,15 @@ export function createNotifications(ctx) {
     }
     panel.appendChild(body);
     panel.appendChild(h('p', { class: 'notifpanel__foot hint' },
-      'Built from the live demo data — place an order or restock a product and this list changes with it.'));
+      t('notify.foot')));
   }
 
   function sync() {
     const unread = unreadOf(feed(ctx.state));
     badge.textContent = String(unread.length);
     badge.hidden = unread.length === 0;
-    button.setAttribute('aria-label', unread.length ? `Notifications, ${unread.length} unread` : 'Notifications, none unread');
-    button.title = unread.length ? `${unread.length} unread notifications` : 'Notifications';
+    button.setAttribute('aria-label', unread.length ? t('notify.unreadAria', { n: unread.length }) : t('notify.noneAria'));
+    button.title = unread.length ? t('notify.unreadTitle', { n: unread.length }) : t('notify.title');
   }
 
   function close() {

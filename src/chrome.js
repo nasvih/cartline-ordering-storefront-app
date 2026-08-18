@@ -12,6 +12,7 @@
    ============================================================ */
 
 import { h } from '../lib/ui.js';
+import { t } from './main.js';
 
 const THEME_KEY = 'cartline.theme.v1';
 const THEME_COLOR = { light: '#C24A1C', dark: '#141517' };
@@ -48,7 +49,7 @@ export function createThemeButton() {
     applyTheme(theme);
     const dark = theme === 'dark';
     btn.innerHTML = dark ? SUN_ICON : MOON_ICON;
-    const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    const label = dark ? t('chrome.toLight') : t('chrome.toDark');
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.setAttribute('aria-pressed', String(dark));
@@ -87,16 +88,16 @@ const BEZEL = 13;
 export function createDeviceSwitch({ appName = 'Cartline' } = {}) {
   if (isFramed()) return null;
 
-  const group = h('div', { class: 'faceswitch devicesw', role: 'group', 'aria-label': 'Preview this app on a phone or on the desktop' });
+  const group = h('div', { class: 'faceswitch devicesw', role: 'group', 'aria-label': t('chrome.previewGroup') });
   const deskBtn = h('button', {
     type: 'button', class: 'is-on', 'aria-pressed': 'true',
-    title: 'Desktop view', 'aria-label': 'Desktop view',
-    html: `${DESKTOP_ICON}<span>Desktop</span>`,
+    title: t('chrome.desktopView'), 'aria-label': t('chrome.desktopView'),
+    html: `${DESKTOP_ICON}<span>${t('chrome.desktop')}</span>`,
   });
   const phoneBtn = h('button', {
     type: 'button', 'aria-pressed': 'false',
-    title: 'Preview on a phone', 'aria-label': 'Preview on a phone',
-    html: `${PHONE_ICON}<span>Phone</span>`,
+    title: t('chrome.phoneView'), 'aria-label': t('chrome.phoneView'),
+    html: `${PHONE_ICON}<span>${t('chrome.phone')}</span>`,
   });
   group.appendChild(deskBtn);
   group.appendChild(phoneBtn);
@@ -142,7 +143,7 @@ export function createDeviceSwitch({ appName = 'Cartline' } = {}) {
     /* carry whatever screen you are on into the frame */
     const src = `${location.pathname}?frame=1${location.hash || '#/shop'}`;
     const frame = h('iframe', {
-      class: 'phone__screen', src, title: `${appName} at 390 by 844 pixels`,
+      class: 'phone__screen', src, title: t('chrome.frameTitle', { app: appName }),
       width: String(PHONE_W), height: String(PHONE_H),
     });
     stage = h('div', { class: 'phone' },
@@ -152,16 +153,16 @@ export function createDeviceSwitch({ appName = 'Cartline' } = {}) {
 
     const back = h('button', {
       class: 'btn', type: 'button', onclick: exit,
-      html: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4M8.5 5.5L4 10l4.5 4.5"/></svg><span>Back to desktop</span>',
+      html: `<svg class="icon-dir" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4M8.5 5.5L4 10l4.5 4.5"/></svg><span>${t('chrome.backToDesktop')}</span>`,
     });
 
-    host = h('div', { class: 'devicepv', role: 'dialog', 'aria-label': `${appName} phone preview`, 'aria-modal': 'true' },
+    host = h('div', { class: 'devicepv', role: 'dialog', 'aria-label': t('chrome.previewAria', { app: appName }), 'aria-modal': 'true' },
       h('div', { class: 'devicepv__bar' },
         h('div', { class: 'devicepv__id' },
           h('span', { class: 'devicepv__name' }, appName),
           h('span', { class: 'devicepv__size mono' }, `${PHONE_W} × ${PHONE_H}`)),
         back),
-      h('p', { class: 'devicepv__note' }, 'A live copy of the app in a phone-sized frame — the real layout at the real width, not a picture of it. Everything in it works, and it shares this browser\'s data.'),
+      h('p', { class: 'devicepv__note' }, t('chrome.previewNote')),
       h('div', { class: 'devicepv__fit' }, stage));
 
     document.body.appendChild(host);

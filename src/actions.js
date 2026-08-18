@@ -12,10 +12,12 @@
      run()    -> { text, table?, meta?, suggestions?, actions? }  (appended)
    ============================================================ */
 
-import { money, num, toast, ago } from '../lib/ui.js';
+import { money, num, toast, ago, fmtDate } from '../lib/ui.js';
 import {
   CATEGORIES, REFUND_REASONS, STATUSES, dayKey, orderByNo, discountByCode,
 } from './data.js';
+import { t } from './main.js';
+import { tr, catName } from './strings.js';
 
 /* ---------- small language helpers ---------- */
 
@@ -28,11 +30,6 @@ const STAGE_WORD = {
   new: 'new', preparing: 'preparing', prep: 'preparing', ready: 'ready',
   complete: 'completed', completed: 'completed', done: 'completed', 'handed over': 'completed',
 };
-const STAGE_LABEL = {
-  new: 'New', preparing: 'Preparing', ready: 'Ready', completed: 'Completed',
-  refunded: 'Refunded', cancelled: 'Cancelled',
-};
-
 function cleanTerm(t) {
   return String(t || '')
     .replace(/^(?:please\s+|can you\s+|could you\s+|kindly\s+)/i, '')
@@ -64,9 +61,14 @@ function noProduct(state, term) {
   const words = norm(term).split(' ').filter((w) => w.length > 2);
   const near = state.products.filter((p) => words.some((w) => norm(p.name).includes(w.slice(0, 4)))).slice(0, 3);
   return {
-    text: `Nothing in the catalogue is called "${term}". ${near.length ? `Did you mean ${near.map((p) => `**${p.name}**`).join(', ')}?` : `There are ${num(state.products.length)} products — ask "what is low on stock" if you want the list.`}`,
-    meta: `searched ${num(state.products.length)} product names and SKUs`,
-    suggestions: ['What is low on stock?', 'What can you do?'],
+    text: t('acts.noProduct', {
+      term,
+      near: near.length
+        ? t('acts.didYouMean', { names: near.map((p) => `**${p.name}**`).join(', ') })
+        : t('acts.noNear', { n: num(state.products.length) }),
+    }),
+    meta: t('acts.noProductMeta', { n: num(state.products.length) }),
+    suggestions: [t('ask.lowStock'), t('ask.whatCanYouDo')],
   };
 }
 
@@ -74,13 +76,13 @@ function noProduct(state, term) {
    offer the exact records as buttons so the next press is unambiguous. */
 function ambiguousProduct(list, term, label, run) {
   return {
-    text: `${titleCase(countWord(list.length))} products match "${term}" — I will not guess which one you mean. Pick the exact record.`,
+    text: t('acts.ambiguous', { count: titleCase(countWord(list.length)), n: list.length, term }),
     table: {
-      head: ['Product', 'SKU', 'Stock', 'Price'],
+      head: [t('common.product'), t('common.sku'), t('common.stock'), t('common.price')],
       rows: list.slice(0, 6).map((p) => [p.name, p.sku, String(p.stock), String(p.price)]),
     },
-    meta: `matched ${num(list.length)} products on "${term}"`,
-    actions: list.slice(0, 4).map((p) => ({ label: label(p), doingLabel: 'Applying…', run: () => run(p) })),
+    meta: t('acts.ambiguousMeta', { n: num(list.length), term }),
+    actions: list.slice(0, 4).map((p) => ({ label: label(p), doingLabel: t('acts.applying'), run: () => run(p) })),
   };
 }
 
@@ -157,7 +159,7 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 function readDeadline(raw) {
   const t = norm(raw);
   if (!t) return null;
-  const fmt = (d) => d.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' });
+  const fmt = (d) => fmtDate(d, { weekday: 'long', day: '2-digit', month: 'short' });
   if (t === 'tomorrow') { const d = new Date(); d.setDate(d.getDate() + 1); return fmt(d); }
   if (t === 'today' || t === 'tonight') return fmt(new Date());
   const wd = WEEKDAYS.findIndex((w) => t.startsWith(w));
@@ -186,14 +188,23 @@ function parseDiscount(q) {
     code: codeM ? codeM[1].toUpperCase() : null,
     minOrder: minM ? Number(minM[1]) : 0,
     scope: cat ? cat.name : '',
+    scopeId: cat ? cat.id : '',
     until: untilM ? readDeadline(untilM[1]) : null,
   };
 }
 
+/* The two states, in the words each language uses for them. The Arabic
+   alternatives carry Arabic letters, so they can never fire on English input;
+   the English ones are untouched. Everything downstream is language-blind —
+   `norm()` reduces the sentence to its Latin run, which is the product name. */
+const OUT_AR = /(نافد|نفد|غير\s*متاح|غير\s*متوفر|خارج\s+المخزون|من\s+القائمة)/;
+const BACK_AR = /(إلى\s+المخزون|الى\s+المخزون|متاح\s+(?:مجدد|مرة)|للبيع|عاد\s+للبيع)/;
+
 function parseAvailability(q) {
-  const out = /\b(out of stock|sold out|unavailable|not available|off the menu|off sale)\b/i.test(q);
-  const back = /\b(back in stock|in stock again|available again|back on (?:the )?(?:menu|sale)|back on)\b/i.test(q);
-  const qtyM = q.match(/\b(?:with|at|to)\s+(\d+)\b/i) || q.match(/\b(\d+)\s*(?:units?|pcs?|pieces?)\b/i);
+  const out = /\b(out of stock|sold out|unavailable|not available|off the menu|off sale)\b/i.test(q) || OUT_AR.test(q);
+  const back = /\b(back in stock|in stock again|available again|back on (?:the )?(?:menu|sale)|back on)\b/i.test(q) || BACK_AR.test(q);
+  const qtyM = q.match(/\b(?:with|at|to)\s+(\d+)\b/i) || q.match(/\b(\d+)\s*(?:units?|pcs?|pieces?)\b/i)
+    || q.match(/(?:بـ|بمقدار|ب)\s*(\d+)/);
   const term = cleanTerm(q
     .replace(/^(?:please\s+|can you\s+|could you\s+)?(?:mark|set|flag|make|put|show|list|take)\s+/i, '')
     .replace(/\s*\b(?:as|to|back)?\s*(?:out of stock|sold out|unavailable|not available|off the menu|off sale|back in stock|in stock again|available again|back on (?:the )?(?:menu|sale)|back on)\b.*$/i, '')
@@ -218,21 +229,29 @@ export function actionIntents(ctx) {
       if (t) t.stock = Math.max(0, t.stock + qty);
     });
     const after = (ctx.state.products.find((x) => x.id === p.id) || {}).stock;
-    toast(`${p.name} restocked to ${after}`, 'ok');
+    toast(t('acts.restockToast', { name: p.name, n: after }), 'ok');
     reveal(ctx, 'products');
     const limit = ctx.state.settings.lowStockAt;
     return {
-      text: `Done. **${p.name}** (${p.sku}) went from ${num(before)} to **${num(after)}** units.${after > limit && before <= limit ? ' It is off the low-stock list now.' : ''}`,
+      text: t('acts.restockDone', {
+        name: p.name,
+        sku: p.sku,
+        before: num(before),
+        after: num(after),
+        off: after > limit && before <= limit ? t('acts.restockOff') : '',
+      }),
       table: {
-        head: ['Field', 'Before', 'After'],
+        head: [t('common.field'), t('common.before'), t('common.after')],
         rows: [
-          ['Stock', String(before), `**${after}**`],
-          ['State', before <= limit ? (before === 0 ? 'Out of stock' : 'Low stock') : 'Listed', after <= limit ? (after === 0 ? 'Out of stock' : 'Low stock') : 'Listed'],
-          ['Stock at cost', M(before * p.cost), M(after * p.cost)],
+          [t('common.stock'), String(before), `**${after}**`],
+          [t('common.state'),
+            before <= limit ? (before === 0 ? t('acts.outOfStock') : t('acts.lowStock')) : t('acts.listed'),
+            after <= limit ? (after === 0 ? t('acts.outOfStock') : t('acts.lowStock')) : t('acts.listed')],
+          [t('acts.stockAtCost'), M(before * p.cost), M(after * p.cost)],
         ],
       },
-      meta: `wrote ${p.sku} to the product table`,
-      suggestions: ['What is low on stock?', 'How much stock do we hold?', 'What can you do?'],
+      meta: t('acts.wroteProduct', { sku: p.sku }),
+      suggestions: [t('ask.lowStock'), t('ask.stockValue'), t('ask.whatCanYouDo')],
     };
   }
 
@@ -245,25 +264,32 @@ export function actionIntents(ctx) {
       /\b(restock|re-stock|top\s*up|stock\s*up|book in)\b/i,
       /\b(?:restock|re-stock|top\s*up|stock\s*up|add|bring in|order in|receive)\s+(?:\d+\s+(?:units?\s+)?(?:of|to)\s+)?(?:the\s+)?[a-z][a-z0-9]{2,}/i,
     ],
-    trace: 'read the stock line for the product you named',
+    trace: t('acts.restockTrace'),
     answer: (q) => {
       const { term, qty } = parseRestock(q);
-      if (!term) return { text: 'Name the product and I will take its stock up — for example "restock Karak Chai by 24".', suggestions: ['What is low on stock?', 'What can you do?'] };
+      if (!term) return { text: t('acts.restockAsk'), suggestions: [t('ask.lowStock'), t('ask.whatCanYouDo')] };
       const hits = matchProducts(ctx.state, term);
       if (!hits.length) return noProduct(ctx.state, term);
       const amount = qty || 20;
       if (hits.length > 1) {
-        return ambiguousProduct(hits, term, (p) => `${p.name} +${amount}`, (p) => runRestock(p, amount));
+        return ambiguousProduct(hits, term, (p) => t('acts.restockChip', { name: p.name, n: amount }), (p) => runRestock(p, amount));
       }
       const p = hits[0];
       return {
-        text: `**${p.name}** (${p.sku}) is on ${num(p.stock)} units. Adding ${num(amount)} takes it to **${num(p.stock + amount)}**${qty ? '' : ' — 20 is my default, say "by 40" for another number'}.`,
+        text: t('acts.restockPreview', {
+          name: p.name,
+          sku: p.sku,
+          stock: num(p.stock),
+          add: num(amount),
+          after: num(p.stock + amount),
+          tail: qty ? '' : t('acts.restockDefaultTail'),
+        }),
         table: {
-          head: ['Field', 'Now', 'After'],
-          rows: [['Stock', String(p.stock), String(p.stock + amount)], ['At cost', M(p.stock * p.cost), M((p.stock + amount) * p.cost)]],
+          head: [t('common.field'), t('common.now'), t('common.after')],
+          rows: [[t('common.stock'), String(p.stock), String(p.stock + amount)], [t('reads.atCostRow'), M(p.stock * p.cost), M((p.stock + amount) * p.cost)]],
         },
-        meta: `read ${p.sku} from the product table`,
-        actions: [{ label: `Restock ${p.name} by ${amount}`, doingLabel: 'Restocking…', run: () => runRestock(p, amount) }],
+        meta: t('acts.readProduct', { sku: p.sku }),
+        actions: [{ label: t('acts.restockLabel', { name: p.name, n: amount }), doingLabel: t('acts.restocking'), run: () => runRestock(p, amount) }],
       };
     },
   };
@@ -276,24 +302,29 @@ export function actionIntents(ctx) {
       const t = s.products.find((x) => x.id === p.id);
       if (t) t.price = price;
     });
-    toast(`${p.name} is now ${M(price)}`, 'ok');
+    toast(t('acts.priceToast', { name: p.name, price: M(price) }), 'ok');
     reveal(ctx, 'products');
     const margin = (v) => `${Math.round(((v - p.cost) / v) * 100)}%`;
     return {
-      text: `**${p.name}** is now ${M(price)}, ${price >= before ? 'up' : 'down'} from ${M(before)}. The storefront and the cart use the new price from the next order; orders already placed keep the price they were billed at.`,
+      text: t('acts.priceDone', {
+        name: p.name,
+        price: M(price),
+        dir: price >= before ? t('acts.priceUp') : t('acts.priceDown'),
+        before: M(before),
+      }),
       table: {
-        head: ['Field', 'Before', 'After'],
-        rows: [['Price', M(before), `**${M(price)}**`], ['Cost', M(p.cost), M(p.cost)], ['Margin', margin(before), margin(price)]],
+        head: [t('common.field'), t('common.before'), t('common.after')],
+        rows: [[t('common.price'), M(before), `**${M(price)}**`], [t('common.cost'), M(p.cost), M(p.cost)], [t('common.margin'), margin(before), margin(price)]],
       },
-      meta: `wrote ${p.sku} to the product table`,
-      suggestions: ['What sold best today?', 'Which category earns most?', 'What can you do?'],
+      meta: t('acts.wroteProduct', { sku: p.sku }),
+      suggestions: [t('ask.bestSellers'), t('ask.category'), t('ask.whatCanYouDo')],
     };
   }
 
   const price = {
     id: 'act-price',
     match: [/\bprice\b/i, /\b(change|set|update|make|drop|raise|reduce|increase)\b/i, /\b(?:to|at)\s*(?:₹|rs\.?|inr)?\s*\d+/i],
-    trace: 'read the price and cost of the product you named',
+    trace: t('acts.priceTrace'),
     answer: (q) => {
       const parsed = parsePrice(q);
       if (!parsed) {
@@ -304,37 +335,54 @@ export function actionIntents(ctx) {
         if (asked.length === 1) {
           const p = asked[0];
           return {
-            text: `**${p.name}** (${p.sku}) sells at ${M(p.price)}, costs ${M(p.cost)}, margin ${Math.round(((p.price - p.cost) / p.price) * 100)}%. ${num(p.stock)} units on hand.\n\nSay "change the price of ${p.name} to ${p.price + 5}" and I will do it.`,
-            meta: `read ${p.sku} from the product table`,
-            suggestions: ['What sold best today?', 'What is low on stock?', 'What can you do?'],
+            text: t('acts.priceQuestion', {
+              name: p.name,
+              sku: p.sku,
+              price: M(p.price),
+              cost: M(p.cost),
+              margin: Math.round(((p.price - p.cost) / p.price) * 100),
+              stock: num(p.stock),
+              next: p.price + 5,
+            }),
+            meta: t('acts.readProduct', { sku: p.sku }),
+            suggestions: [t('ask.bestSellers'), t('ask.lowStock'), t('ask.whatCanYouDo')],
           };
         }
         return {
-          text: 'Say it as "change the price of Filter Coffee to 45" and I will show you the before and after before anything moves.',
-          suggestions: ['What can you do?', 'What sold best today?'],
+          text: t('acts.priceAsk'),
+          suggestions: [t('ask.whatCanYouDo'), t('ask.bestSellers')],
         };
       }
       const hits = matchProducts(ctx.state, parsed.term);
       if (!hits.length) return noProduct(ctx.state, parsed.term);
       if (hits.length > 1) {
-        return ambiguousProduct(hits, parsed.term, (p) => `${p.name} → ${M(parsed.price)}`, (p) => runPrice(p, parsed.price));
+        return ambiguousProduct(hits, parsed.term, (p) => t('acts.priceChip', { name: p.name, price: M(parsed.price) }), (p) => runPrice(p, parsed.price));
       }
       const p = hits[0];
       if (parsed.price <= p.cost) {
         return {
-          text: `I will not set **${p.name}** to ${M(parsed.price)} — that is at or below its ${M(p.cost)} cost, so every sale would lose money. Give me a price above ${M(p.cost)}.`,
-          meta: `checked ${p.sku} against its cost price`,
+          text: t('acts.priceBelowCost', { name: p.name, price: M(parsed.price), cost: M(p.cost) }),
+          meta: t('acts.priceCheckMeta', { sku: p.sku }),
         };
       }
-      if (parsed.price === p.price) return { text: `**${p.name}** is already ${M(p.price)}. Nothing to change.` };
+      if (parsed.price === p.price) return { text: t('acts.priceSame', { name: p.name, price: M(p.price) }) };
       return {
-        text: `**${p.name}** (${p.sku}) is ${M(p.price)} today. I would set it to **${M(parsed.price)}** — a ${Math.abs(Math.round(((parsed.price - p.price) / p.price) * 100))}% ${parsed.price > p.price ? 'rise' : 'cut'}, margin ${Math.round(((p.price - p.cost) / p.price) * 100)}% → ${Math.round(((parsed.price - p.cost) / parsed.price) * 100)}%.`,
+        text: t('acts.pricePreview', {
+          name: p.name,
+          sku: p.sku,
+          price: M(p.price),
+          next: M(parsed.price),
+          pct: Math.abs(Math.round(((parsed.price - p.price) / p.price) * 100)),
+          dir: parsed.price > p.price ? t('acts.priceRise') : t('acts.priceCut'),
+          from: Math.round(((p.price - p.cost) / p.price) * 100),
+          to: Math.round(((parsed.price - p.cost) / parsed.price) * 100),
+        }),
         table: {
-          head: ['Field', 'Now', 'After'],
-          rows: [['Price', M(p.price), M(parsed.price)], ['Cost', M(p.cost), M(p.cost)]],
+          head: [t('common.field'), t('common.now'), t('common.after')],
+          rows: [[t('common.price'), M(p.price), M(parsed.price)], [t('common.cost'), M(p.cost), M(p.cost)]],
         },
-        meta: `read ${p.sku} from the product table`,
-        actions: [{ label: `Set ${p.name} to ${M(parsed.price)}`, doingLabel: 'Saving…', run: () => runPrice(p, parsed.price) }],
+        meta: t('acts.readProduct', { sku: p.sku }),
+        actions: [{ label: t('acts.priceLabel', { name: p.name, price: M(parsed.price) }), doingLabel: t('acts.priceSaving'), run: () => runPrice(p, parsed.price) }],
       };
     },
   };
@@ -352,17 +400,22 @@ export function actionIntents(ctx) {
       o.updatedAt = at;
       o.timeline.push({ at, label: `Moved to ${stage} by Cartline Assist`, by: s.settings.counterName });
     });
-    toast(`${order.no} → ${stage}`, 'ok');
+    toast(t('orderops.moved', { no: order.no, stage: t(`data.statusRaw.${stage}`) }), 'ok');
     reveal(ctx, 'board');
     const o = ctx.state.orders.find((x) => x.id === order.id);
     return {
-      text: `**${order.no}** moved from ${STAGE_LABEL[before].toLowerCase()} to **${STAGE_LABEL[stage].toLowerCase()}**. ${order.customer} sees the same step on the tracking screen.`,
+      text: t('acts.stageDone', {
+        no: order.no,
+        from: t(`data.statusRaw.${before}`),
+        to: t(`data.statusRaw.${stage}`),
+        customer: order.customer,
+      }),
       table: {
-        head: ['Field', 'Before', 'After'],
-        rows: [['Stage', STAGE_LABEL[before], `**${STAGE_LABEL[stage]}**`], ['Timeline entries', String(steps), String(o ? o.timeline.length : steps + 1)]],
+        head: [t('common.field'), t('common.before'), t('common.after')],
+        rows: [[t('acts.stageRow'), t(`data.status.${before}`), `**${t(`data.status.${stage}`)}**`], [t('acts.stageEntries'), String(steps), String(o ? o.timeline.length : steps + 1)]],
       },
-      meta: `wrote ${order.no} and appended one timeline entry`,
-      suggestions: ['Show the open orders', `Where is order ${order.no}?`, 'What can you do?'],
+      meta: t('acts.stageMeta', { no: order.no }),
+      suggestions: [t('ask.openOrders'), t('ask.whereOrder', { no: order.no }), t('ask.whatCanYouDo')],
     };
   }
 
@@ -374,33 +427,46 @@ export function actionIntents(ctx) {
       /\b(move|advance|push|progress|bump)\b[^?]{0,60}?(?:cl[\s-]?\d{3,}|order\s*#?\s*\d{3,}|\b\d{3,}\b)/i,
       /\b(?:cl[\s-]?\d{3,}|order\s*#?\s*\d{3,})\b[^?]{0,30}\b(?:to|into)\s+(?:new|preparing|prep|ready|completed?|done)\b/i,
     ],
-    trace: 'read the order and the columns either side of it',
+    trace: t('acts.stageTrace'),
     answer: (q) => {
       const parsed = parseStage(q);
       if (!parsed.ref) {
         const open = ctx.state.orders.filter((o) => STATUSES.includes(o.status) && o.status !== 'completed');
         return {
-          text: `Give me the number — "move CL-1052 to ready". ${open.length ? `${countWord(open.length)} orders are open right now, oldest first: ${open.slice(0, 3).map((o) => o.no).join(', ')}.` : 'The board is clear at the moment.'}`,
-          suggestions: ['Show the open orders', 'What can you do?'],
+          text: t('acts.stageAsk', {
+            tail: open.length
+              ? t('acts.stageOpen', { count: countWord(open.length), n: open.length, list: open.slice(0, 3).map((o) => o.no).join(', ') })
+              : t('acts.stageClear'),
+          }),
+          suggestions: [t('ask.openOrders'), t('ask.whatCanYouDo')],
         };
       }
       const o = orderByNo(ctx.state, parsed.ref);
-      if (!o) return { text: `There is no order numbered ${parsed.ref} here. Numbers in this demo run from CL-1042 upwards.`, suggestions: ['Show the open orders'] };
+      if (!o) return { text: t('acts.stageMissing', { n: parsed.ref }), suggestions: [t('ask.openOrders')] };
       if (o.status === 'refunded' || o.status === 'cancelled') {
-        return { text: `**${o.no}** is ${o.status} — a closed order does not go back on the board. Only a demo reset brings it back.`, meta: `read ${o.no}` };
+        return { text: t('acts.stageClosed', { no: o.no, status: t(`data.statusRaw.${o.status}`) }), meta: t('acts.readOrder', { no: o.no }) };
       }
       const i = STATUSES.indexOf(o.status);
       const target = parsed.stage || STATUSES[Math.min(i + 1, STATUSES.length - 1)];
-      if (target === o.status) return { text: `**${o.no}** is already ${STAGE_LABEL[target].toLowerCase()}. Nothing to move.` };
+      if (target === o.status) return { text: t('acts.stageSame', { no: o.no, stage: t(`data.statusRaw.${target}`) }) };
       const back = STATUSES.indexOf(target) < i;
       return {
-        text: `**${o.no}** — ${o.customer}, ${o.channel.toLowerCase()}, ${M(o.total)} — sits at **${STAGE_LABEL[o.status].toLowerCase()}**, placed ${ago(o.placedAt)}. I would ${back ? 'send it back to' : 'move it to'} **${STAGE_LABEL[target].toLowerCase()}**.`,
+        text: t('acts.stagePreview', {
+          no: o.no,
+          customer: o.customer,
+          channel: t(`data.channel.${o.channel}`).toLowerCase(),
+          money: M(o.total),
+          stage: t(`data.statusRaw.${o.status}`),
+          ago: ago(o.placedAt),
+          verb: back ? t('acts.stageBack') : t('acts.stageForward'),
+          target: t(`data.statusRaw.${target}`),
+        }),
         table: {
-          head: ['Field', 'Now', 'After'],
-          rows: [['Stage', STAGE_LABEL[o.status], STAGE_LABEL[target]], ['On the board since', ago(o.placedAt), 'moved just now'], ['Total', M(o.total), M(o.total)]],
+          head: [t('common.field'), t('common.now'), t('common.after')],
+          rows: [[t('acts.stageRow'), t(`data.status.${o.status}`), t(`data.status.${target}`)], [t('acts.stageSince'), ago(o.placedAt), t('acts.stageJustNow')], [t('common.total'), M(o.total), M(o.total)]],
         },
-        meta: `read ${o.no} from the order board`,
-        actions: [{ label: `Move ${o.no} to ${STAGE_LABEL[target].toLowerCase()}`, doingLabel: 'Moving…', run: () => runStage(o, target) }],
+        meta: t('acts.readBoard', { no: o.no }),
+        actions: [{ label: t('acts.stageLabel', { no: o.no, stage: t(`data.statusRaw.${target}`) }), doingLabel: t('acts.stageMoving'), run: () => runStage(o, target) }],
       };
     },
   };
@@ -416,29 +482,35 @@ export function actionIntents(ctx) {
       if (!o) return;
       o.status = 'refunded';
       o.updatedAt = at;
-      o.refund = { amount, reason, note: 'Refunded from Cartline Assist.', at, by: s.settings.counterName };
+      o.refund = { amount, reason, note: t('acts.refundNote'), at, by: s.settings.counterName };
       o.timeline.push({ at, label: `Refunded ${s.settings.currency}${amount}`, by: s.settings.counterName });
       o.items.forEach((it) => {
         const p = s.products.find((x) => x.id === it.productId);
         if (p) p.stock += it.qty;
       });
     });
-    toast(`${order.no} refunded`, 'bad');
+    toast(t('orderops.refunded', { no: order.no }), 'bad');
     reveal(ctx, 'orders');
     const day = dayKey(new Date());
     const today = ctx.state.orders.filter((o) => o.status === 'refunded' && dayKey(o.placedAt) === day);
     return {
-      text: `**${order.no}** is refunded — ${M(amount)} back to ${order.customer}, reason recorded as "${reason.toLowerCase()}". The ${num(order.items.reduce((t, it) => t + it.qty, 0))} items went back into stock and today's net revenue drops by ${M(amount)}.`,
+      text: t('acts.refundDone', {
+        no: order.no,
+        money: M(amount),
+        customer: order.customer,
+        reason: tr('refundReason', reason).toLowerCase(),
+        items: num(order.items.reduce((sum, it) => sum + it.qty, 0)),
+      }),
       table: {
-        head: ['Field', 'Before', 'After'],
+        head: [t('common.field'), t('common.before'), t('common.after')],
         rows: [
-          ['Status', STAGE_LABEL[wasStatus], '**Refunded**'],
-          ['Refund on the order', '—', M(amount)],
-          ['Refunds today', String(today.length - 1), String(today.length)],
+          [t('common.status'), t(`data.status.${wasStatus}`), t('acts.refundedBold')],
+          [t('acts.refundRowOnOrder'), t('common.dash'), M(amount)],
+          [t('acts.refundRowToday'), String(today.length - 1), String(today.length)],
         ],
       },
-      meta: `wrote ${order.no}, its refund record and ${num(order.items.length)} stock lines`,
-      suggestions: ['Why do orders get refunded?', "What is today's revenue?", 'What can you do?'],
+      meta: t('acts.refundMeta', { no: order.no, n: num(order.items.length) }),
+      suggestions: [t('ask.whyRefunds'), t('ask.revenue'), t('ask.whatCanYouDo')],
     };
   }
 
@@ -448,37 +520,53 @@ export function actionIntents(ctx) {
        number. "Why do orders get refunded?" is a question for the reader, not a
        refund to apply, and it does not match this. */
     match: [/\brefund(?:ing)?\b[^?]{0,60}?(?:cl[\s-]?\d{3,}|order\s*#?\s*\d{3,}|\b\d{3,}\b)/i],
-    trace: 'read the order, its payment and its lines',
+    trace: t('acts.refundTrace'),
     answer: (q) => {
       const parsed = parseRefund(q);
       if (!parsed.ref) {
         return {
-          text: 'Which order? Say "refund CL-1049, wrong item packed" and I will show you the amount and the reason before it goes through.',
-          suggestions: ['Show the open orders', 'Why do orders get refunded?'],
+          text: t('acts.refundAsk'),
+          suggestions: [t('ask.openOrders'), t('ask.whyRefunds')],
         };
       }
       const o = orderByNo(ctx.state, parsed.ref);
-      if (!o) return { text: `No order numbered ${parsed.ref} exists here.`, suggestions: ['Show the open orders'] };
+      if (!o) return { text: t('acts.refundMissing', { n: parsed.ref }), suggestions: [t('ask.openOrders')] };
       if (o.status === 'refunded') {
-        return { text: `**${o.no}** was already refunded ${M(o.refund.amount)} — ${o.refund.reason.toLowerCase()}. I will not refund it twice.`, meta: `read the refund record on ${o.no}` };
+        return {
+          text: t('acts.refundTwice', { no: o.no, money: M(o.refund.amount), reason: tr('refundReason', o.refund.reason).toLowerCase() }),
+          meta: t('acts.refundReadMeta', { no: o.no }),
+        };
       }
-      if (o.status === 'cancelled') return { text: `**${o.no}** was cancelled before the kitchen touched it, so nothing was taken to give back.` };
-      const head = `**${o.no}** — ${o.customer} paid ${M(o.total)} by ${o.payment}, ${o.channel.toLowerCase()}, placed ${ago(o.placedAt)}.`;
+      if (o.status === 'cancelled') return { text: t('acts.refundCancelled', { no: o.no }) };
+      const head = t('acts.refundHead', {
+        no: o.no,
+        customer: o.customer,
+        money: M(o.total),
+        payment: t(`data.payment.${o.payment}`),
+        channel: t(`data.channel.${o.channel}`).toLowerCase(),
+        ago: ago(o.placedAt),
+      });
       if (!parsed.reason) {
         return {
-          text: `${head}\n\nA refund needs a reason on it, otherwise nobody can review it later. Pick one, or say "refund ${o.no} because the delivery was late".`,
-          meta: `read ${o.no} and the five recorded refund reasons`,
-          actions: REFUND_REASONS.slice(0, 3).map((r) => ({ label: r, doingLabel: 'Refunding…', run: () => runRefund(o, r) })),
+          text: t('acts.refundNeedReason', { head, no: o.no }),
+          meta: t('acts.refundReasonsMeta', { no: o.no }),
+          actions: REFUND_REASONS.slice(0, 3).map((r) => ({ label: tr('refundReason', r), doingLabel: t('acts.refunding'), run: () => runRefund(o, r) })),
         };
       }
       return {
-        text: `${head} Refunding the full ${M(o.total)} with the reason "${parsed.reason.toLowerCase()}", and the ${num(o.items.reduce((t, it) => t + it.qty, 0))} units across ${num(o.items.length)} lines go back into stock.`,
+        text: t('acts.refundPreview', {
+          head,
+          money: M(o.total),
+          reason: tr('refundReason', parsed.reason).toLowerCase(),
+          units: num(o.items.reduce((sum, it) => sum + it.qty, 0)),
+          lines: num(o.items.length),
+        }),
         table: {
-          head: ['Item', 'Qty', 'Line'],
+          head: [t('common.item'), t('common.qty'), t('common.line')],
           rows: o.items.map((it) => [it.name, String(it.qty), M(it.price * it.qty)]),
         },
-        meta: `read ${o.no} and its ${o.items.length} lines`,
-        actions: [{ label: `Refund ${M(o.total)} on ${o.no}`, doingLabel: 'Refunding…', run: () => runRefund(o, parsed.reason) }],
+        meta: t('acts.refundLinesMeta', { no: o.no, n: o.items.length }),
+        actions: [{ label: t('acts.refundLabel', { money: M(o.total), no: o.no }), doingLabel: t('acts.refunding'), run: () => runRefund(o, parsed.reason) }],
       };
     },
   };
@@ -487,22 +575,22 @@ export function actionIntents(ctx) {
 
   function runDiscount(d) {
     ctx.store.update((s) => { s.discounts.push({ ...d, active: true, uses: 0, maxUses: 0 }); });
-    toast(`${d.code} is live on the storefront`, 'ok');
+    toast(t('acts.codeToast', { code: d.code }), 'ok');
     reveal(ctx, 'discounts');
     return {
-      text: `**${d.code}** is live. Type it into the cart on the storefront and it comes off the basket straight away. Pause it any time from Discount codes.`,
+      text: t('acts.codeDone', { code: d.code }),
       table: {
-        head: ['Field', 'Value'],
+        head: [t('common.field'), t('common.value')],
         rows: [
-          ['Code', d.code],
-          ['Discount', d.kind === 'pct' ? `${d.value}% off` : `${M(d.value)} off`],
-          ['Minimum basket', d.minOrder ? M(d.minOrder) : 'None'],
-          ['State', 'Active'],
-          ['Note', d.note],
+          [t('common.code'), d.code],
+          [t('common.discount'), d.kind === 'pct' ? t('discounts.pctOff', { value: d.value }) : t('discounts.flatOff', { money: M(d.value) })],
+          [t('acts.codeMinRow'), d.minOrder ? M(d.minOrder) : t('common.none')],
+          [t('common.state'), t('acts.codeStateActive')],
+          [t('common.note'), d.note],
         ],
       },
-      meta: `added one row to the discount table — ${num(ctx.state.discounts.length)} codes now`,
-      suggestions: ['Which discount code costs most?', 'What is the average order value?', 'What can you do?'],
+      meta: t('acts.codeDoneMeta', { n: num(ctx.state.discounts.length) }),
+      suggestions: [t('ask.costliestCode'), t('ask.aov'), t('ask.whatCanYouDo')],
     };
   }
 
@@ -513,47 +601,58 @@ export function actionIntents(ctx) {
       /\bcode\s+["']?[A-Z][A-Z0-9]{2,15}\b/,
       /\b(create|make|add|set up|new|launch|start|run)\b.*\b(code|discount|offer|coupon|promo)\b/i,
     ],
-    trace: 'read the existing code list before writing a new one',
+    trace: t('acts.codeTrace'),
     answer: (q) => {
       const d = parseDiscount(q);
       if (!d.kind || !d.value) {
         return {
-          text: 'Tell me the size of it — "10% off drinks until Friday, code MONSOON", or "₹75 off baskets over ₹600, code PANTRY75".',
-          suggestions: ['Which discount code costs most?', 'What can you do?'],
+          text: t('acts.codeAskSize'),
+          suggestions: [t('ask.costliestCode'), t('ask.whatCanYouDo')],
         };
       }
       if (!d.code) {
         return {
-          text: `I have the discount — ${d.kind === 'pct' ? `${d.value}% off` : `${M(d.value)} off`}${d.scope ? ` on ${d.scope.toLowerCase()}` : ''} — but not the code itself. Add "code MONSOON" and I will create it.`,
-          meta: 'parsed the sentence but found no code word',
+          text: t('acts.codeAskName', {
+            off: d.kind === 'pct' ? t('discounts.pctOff', { value: d.value }) : t('discounts.flatOff', { money: M(d.value) }),
+            scope: d.scope ? t('acts.codeScope', { name: catName(d.scopeId).toLowerCase() }) : '',
+          }),
+          meta: t('acts.codeNoWord'),
         };
       }
       if (discountByCode(ctx.state, d.code)) {
         const ex = discountByCode(ctx.state, d.code);
         return {
-          text: `**${d.code}** already exists — ${ex.kind === 'pct' ? `${ex.value}% off` : `${M(ex.value)} off`}, ${ex.active ? 'active' : 'paused'}, used ${num(ex.uses)} times. I will not overwrite a live code. Pick another name.`,
-          meta: `checked ${num(ctx.state.discounts.length)} existing codes`,
+          text: t('acts.codeExists', {
+            code: d.code,
+            off: ex.kind === 'pct' ? t('discounts.pctOff', { value: ex.value }) : t('discounts.flatOff', { money: M(ex.value) }),
+            state: ex.active ? t('reads.stateActive') : t('reads.statePaused'),
+            uses: num(ex.uses),
+          }),
+          meta: t('acts.codeCheckedMeta', { n: num(ctx.state.discounts.length) }),
         };
       }
       if (d.kind === 'pct' && d.value > 60) {
-        return { text: `${d.value}% is past the 60% ceiling this store keeps on percentage codes. Give me 60 or less.` };
+        return { text: t('acts.codeCeiling', { value: d.value }) };
       }
-      const note = [d.scope ? `${d.scope} promotion` : 'Storefront promotion',
-        d.until ? `until ${d.until}` : null].filter(Boolean).join(', ');
+      const note = [d.scope ? t('acts.codePromo', { scope: catName(d.scopeId) }) : t('acts.codeStorefront'),
+        d.until ? t('acts.codeUntil', { until: d.until }) : null].filter(Boolean).join(', ');
       const payload = { code: d.code, kind: d.kind, value: d.value, minOrder: d.minOrder || 0, note };
       return {
-        text: `Here is what I read out of that. ${d.until ? `The demo's codes carry no expiry field, so "until ${d.until}" goes into the note rather than switching itself off — pause it from Discount codes when the day comes.` : ''}${d.scope ? ` The same goes for "${d.scope.toLowerCase()}" — a code applies to the whole basket here, so the scope is recorded in the note.` : ''}`,
+        text: t('acts.codePreview', {
+          until: d.until ? t('acts.codeUntilNote', { until: d.until }) : '',
+          scope: d.scope ? t('acts.codeScopeNote', { scope: catName(d.scopeId).toLowerCase() }) : '',
+        }),
         table: {
-          head: ['Field', 'Value'],
+          head: [t('common.field'), t('common.value')],
           rows: [
-            ['Code', d.code],
-            ['Discount', d.kind === 'pct' ? `${d.value}% off` : `${M(d.value)} off`],
-            ['Minimum basket', d.minOrder ? M(d.minOrder) : 'None'],
-            ['Note', note],
+            [t('common.code'), d.code],
+            [t('common.discount'), d.kind === 'pct' ? t('discounts.pctOff', { value: d.value }) : t('discounts.flatOff', { money: M(d.value) })],
+            [t('acts.codeMinRow'), d.minOrder ? M(d.minOrder) : t('common.none')],
+            [t('common.note'), note],
           ],
         },
-        meta: `checked ${d.code} against ${num(ctx.state.discounts.length)} existing codes`,
-        actions: [{ label: `Create ${d.code}`, doingLabel: 'Creating…', run: () => runDiscount(payload) }],
+        meta: t('acts.codeMeta', { code: d.code, n: num(ctx.state.discounts.length) }),
+        actions: [{ label: t('acts.codeLabel', { code: d.code }), doingLabel: t('acts.codeCreating'), run: () => runDiscount(payload) }],
       };
     },
   };
@@ -570,21 +669,21 @@ export function actionIntents(ctx) {
       t.active = true;
       if (out) s.cart.items = s.cart.items.filter((it) => it.productId !== p.id);
     });
-    toast(out ? `${p.name} marked out of stock` : `${p.name} is back on sale`, out ? '' : 'ok');
+    toast(out ? t('acts.availOutToast', { name: p.name }) : t('acts.availBackToast', { name: p.name }), out ? '' : 'ok');
     reveal(ctx, 'products');
     return {
       text: out
-        ? `**${p.name}** is out of stock. The storefront card now reads "Sold out" and it cannot be added to a cart${before ? ` — the ${num(before)} units it was carrying are written off` : ''}.`
-        : `**${p.name}** is back on sale with ${num(after)} units. It shows "In stock" on the storefront again.`,
+        ? t('acts.availOutDone', { name: p.name, tail: before ? t('acts.availOutTail', { n: num(before) }) : '' })
+        : t('acts.availBackDone', { name: p.name, n: num(after) }),
       table: {
-        head: ['Field', 'Before', 'After'],
+        head: [t('common.field'), t('common.before'), t('common.after')],
         rows: [
-          ['Stock', String(before), `**${after}**`],
-          ['Storefront', before > 0 ? 'On sale' : 'Sold out', after > 0 ? 'On sale' : 'Sold out'],
+          [t('common.stock'), String(before), `**${after}**`],
+          [t('acts.availStorefront'), before > 0 ? t('acts.availOnSale') : t('acts.availSoldOut'), after > 0 ? t('acts.availOnSale') : t('acts.availSoldOut')],
         ],
       },
-      meta: `wrote ${p.sku} to the product table`,
-      suggestions: ['What is low on stock?', 'What can you do?'],
+      meta: t('acts.wroteProduct', { sku: p.sku }),
+      suggestions: [t('ask.lowStock'), t('ask.whatCanYouDo')],
     };
   }
 
@@ -593,36 +692,39 @@ export function actionIntents(ctx) {
     /* The verb and the phrase have to be in the same sentence, so "what is out
        of stock" stays a question the low-stock reader answers. */
     match: [/\b(mark|set|flag|make|put|pull|take)\b[^?]{0,48}\b(out of stock|sold out|unavailable|not available|off the menu|back in stock|in stock again|available again|back on sale|back on the menu)\b/i],
-    trace: 'read the product and what the storefront shows for it',
+    trace: t('acts.availTrace'),
     answer: (q) => {
       const parsed = parseAvailability(q);
       if (!parsed.out && !parsed.back) return null;
-      if (!parsed.term) return { text: 'Name the product — "mark Mango Lassi out of stock", or "put Mango Lassi back in stock with 24".' };
+      if (!parsed.term) return { text: t('acts.availAsk') };
       const hits = matchProducts(ctx.state, parsed.term);
       if (!hits.length) return noProduct(ctx.state, parsed.term);
       if (hits.length > 1) {
         return ambiguousProduct(hits, parsed.term,
-          (p) => `${p.name} ${parsed.out ? 'out of stock' : 'back on'}`,
+          (p) => (parsed.out ? t('acts.availOutChip', { name: p.name }) : t('acts.availBackChip', { name: p.name })),
           (p) => runAvailability(p, parsed.out, parsed.qty));
       }
       const p = hits[0];
-      if (parsed.out && p.stock === 0) return { text: `**${p.name}** is already showing sold out on the storefront. Nothing to change.` };
+      if (parsed.out && p.stock === 0) return { text: t('acts.availAlreadyOut', { name: p.name }) };
       if (parsed.back && p.stock > 0) {
         return {
-          text: `**${p.name}** is already on sale with ${num(p.stock)} units. Say "restock ${p.name} by 20" if you want more of it.`,
-          suggestions: ['What is low on stock?'],
+          text: t('acts.availAlreadyOn', { name: p.name, n: num(p.stock) }),
+          suggestions: [t('ask.lowStock')],
         };
       }
       const after = parsed.out ? 0 : Math.max(1, parsed.qty || 20);
       return {
         text: parsed.out
-          ? `**${p.name}** (${p.sku}) has ${num(p.stock)} units on the books. Marking it out of stock writes the stock to zero, takes it off any open cart and shows "Sold out" on the storefront card. The product stays listed, so it comes back with one line.`
-          : `**${p.name}** (${p.sku}) is at zero. I would put ${num(after)} units back on it and the storefront card goes back to "In stock"${parsed.qty ? '' : ' — 20 is my default'}.`,
-        table: { head: ['Field', 'Now', 'After'], rows: [['Stock', String(p.stock), String(after)], ['Storefront', p.stock > 0 ? 'On sale' : 'Sold out', after > 0 ? 'On sale' : 'Sold out']] },
-        meta: `read ${p.sku} from the product table`,
+          ? t('acts.availOutPreview', { name: p.name, sku: p.sku, n: num(p.stock) })
+          : t('acts.availBackPreview', { name: p.name, sku: p.sku, n: num(after), tail: parsed.qty ? '' : t('acts.availDefaultTail') }),
+        table: {
+          head: [t('common.field'), t('common.now'), t('common.after')],
+          rows: [[t('common.stock'), String(p.stock), String(after)], [t('acts.availStorefront'), p.stock > 0 ? t('acts.availOnSale') : t('acts.availSoldOut'), after > 0 ? t('acts.availOnSale') : t('acts.availSoldOut')]],
+        },
+        meta: t('acts.readProduct', { sku: p.sku }),
         actions: [{
-          label: parsed.out ? `Mark ${p.name} out of stock` : `Put ${p.name} back on sale`,
-          doingLabel: 'Applying…',
+          label: parsed.out ? t('acts.availOutLabel', { name: p.name }) : t('acts.availBackLabel', { name: p.name }),
+          doingLabel: t('acts.applying'),
           run: () => runAvailability(p, parsed.out, parsed.qty),
         }],
       };
@@ -640,36 +742,6 @@ export function actionIntents(ctx) {
    never drift apart.
    ============================================================ */
 
-export const ACTION_EXAMPLES = [
-  {
-    ask: 'Restock Karak Chai by 24',
-    reply: 'Names the exact product and its SKU, shows 6 → 30 with the stock value either side, and writes it to Products and stock when you press Restock.',
-  },
-  {
-    ask: 'Change the price of Filter Coffee to 45',
-    reply: 'Shows the old price, the new one, and what it does to the margin. Refuses any price at or below cost.',
-  },
-  {
-    ask: 'Move CL-1052 to ready',
-    reply: 'Pulls the order, shows preparing → ready, and on confirmation moves the card on the board and appends a timeline entry the customer can see.',
-  },
-  {
-    ask: 'Refund CL-1049, wrong item packed',
-    reply: 'Shows the customer, the amount and every line. Applying it marks the order refunded, records the reason and puts the items back into stock. With no reason given it offers the recorded reasons as buttons.',
-  },
-  {
-    ask: '10% off drinks until Friday, code MONSOON',
-    reply: 'Reads the size, the code and the date out of the sentence, says plainly what the demo can and cannot enforce, and creates the code live on the storefront.',
-  },
-  {
-    ask: 'Mark Mango Lassi out of stock',
-    reply: 'Writes the stock to zero, drops it from any open cart and flips the storefront card to "Sold out". "Put Mango Lassi back in stock with 24" reverses it.',
-  },
-];
+export const ACTION_EXAMPLES = () => t('examples.actions');
 
-export const READ_EXAMPLES = [
-  { ask: "What is today's revenue?", reply: 'Gross, net after refunds and the comparison against yesterday, from the orders on file.' },
-  { ask: 'What sold best today?', reply: "Today's order lines grouped by product, top five with quantity and revenue." },
-  { ask: 'What is low on stock?', reply: 'Every product at or below the low-stock threshold, and what a top-up would cost at cost price.' },
-  { ask: 'Where is order CL-1052?', reply: 'The order, its stage, what is on it and when it was last touched.' },
-];
+export const READ_EXAMPLES = () => t('examples.reads');
